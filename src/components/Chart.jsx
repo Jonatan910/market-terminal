@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, CrosshairMode, TickMarkType } from 'lightweight-charts';
-import { fetchCandles, pairLabel, parseId, subscribeCandles } from '../api/market';
+import { fetchCandles, pairLabel, parseId, sourceLabel, subscribeCandles } from '../api/market';
 import { formatPrice } from '../format';
 import { createIndicatorLayer } from '../indicators/layer';
+import { createDrawingController } from '../drawings/controller';
+import DrawingToolbar from './DrawingToolbar';
+import DrawingEditBar from './DrawingEditBar';
 
 const UP = '#26a69a';
 const DOWN = '#ef5350';
@@ -20,6 +23,13 @@ const F = {
 };
 const toDate = (t) => new Date(t * 1000);
 
+const TOOL_HINT = {
+  hline: 'Hacé clic en el precio donde va la línea',
+  hray: 'Hacé clic donde empieza el rayo',
+  vline: 'Hacé clic en la fecha donde va la línea',
+  text: 'Hacé clic donde va el texto',
+};
+
 function tickMark(time, type) {
   const d = toDate(time);
   if (type === TickMarkType.Year) return F.year.format(d);
@@ -28,7 +38,7 @@ function tickMark(time, type) {
   return F.time.format(d);
 }
 
-export default function Chart({ symbol, interval, indicators }) {
+export default function Chart({ symbol, interval, indicators, drawings, onDrawingsChange }) {
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const candlesRef = useRef(null);
@@ -37,11 +47,19 @@ export default function Chart({ symbol, interval, indicators }) {
   const layerRef = useRef(null); // capa de indicadores
   const barsRef = useRef([]); // todas las velas cargadas (para calcular indicadores)
   const hoverRef = useRef(false); // ¿el cursor está sobre el gráfico?
+  const drawRef = useRef(null); // controlador de dibujos
+  const onDrawingsChangeRef = useRef(onDrawingsChange);
+  onDrawingsChangeRef.current = onDrawingsChange;
+  const [tool, setTool] = useState('cursor');
+  const [magnet, setMagnet] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [error, setError] = useState('');
   const [legend, setLegend] = useState(null); // vela bajo el cursor
   const [last, setLast] = useState(null); // última vela (en vivo)
   const [indLegend, setIndLegend] = useState([]); // valores de los indicadores
+  const [meta, setMeta] = useState({}); // { exchange, name } de la acción
   intervalRef.current = interval;
 
   // 1) Crear el gráfico una sola vez.
@@ -83,6 +101,14 @@ export default function Chart({ symbol, interval, indicators }) {
     candlesRef.current.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.25 } });
 
     layerRef.current = createIndicatorLayer(chart);
+    drawRef.current = createDrawingController({
+      chart,
+      series: candlesRef.current,
+      container: containerRef.current,
+      onChange: (list) => onDrawingsChangeRef.current(list),
+      onSelect: setSelectedId,
+      onToolDone: () => setTool('cursor'),
+    });
 
     // Leyenda: muestra los valores de la vela (y de los indicadores) bajo el cursor.
     chart.subscribeCrosshairMove((param) => {
@@ -94,6 +120,8 @@ export default function Chart({ symbol, interval, indicators }) {
 
     chartRef.current = chart;
     return () => {
+      drawRef.current.destroy();
+      drawRef.current = null;
       layerRef.current = null;
       chart.remove();
     };
@@ -105,6 +133,12 @@ export default function Chart({ symbol, interval, indicators }) {
     setIndLegend(layerRef.current.legend(null));
   }, [indicators]);
 
+  // Dibujos y opciones de dibujo -> controlador.
+  useEffect(() => drawRef.current.setDrawings(drawings), [drawings]);
+  useEffect(() => drawRef.current.setTool(tool), [tool]);
+  useEffect(() => drawRef.current.setMagnet(magnet), [magnet]);
+  useEffect(() => drawRef.current.setHidden(hidden), [hidden]);
+
   // 3) Cada vez que cambia el símbolo o la temporalidad: cargar historial y escuchar en vivo.
   useEffect(() => {
     let cancelled = false;
@@ -114,14 +148,17 @@ export default function Chart({ symbol, interval, indicators }) {
 
     const volBar = (c) => ({ time: c.time, value: c.volume, color: c.close >= c.open ? UP + '66' : DOWN + '66' });
 
+    setMeta({});
     fetchCandles(symbol, interval)
-      .then((candles) => {
+      .then(({ bars: candles, ...info }) => {
         if (cancelled) return;
+        setMeta(info);
         if (!candles.length) throw new Error('Sin datos para esta temporalidad');
         barsRef.current = candles;
         candlesRef.current.setData(candles);
         volumeRef.current.setData(candles.map(volBar));
         layerRef.current.setBars(candles);
+        drawRef.current.setBars(candles);
         setIndLegend(layerRef.current.legend(null));
         chartRef.current.timeScale().fitContent();
         setLast(candles.at(-1));
@@ -140,6 +177,7 @@ export default function Chart({ symbol, interval, indicators }) {
           const i = bars.findLastIndex((b) => b.time === c.time);
           barsRef.current = i >= 0 ? [...bars.slice(0, i), c, ...bars.slice(i + 1)] : [...bars, c];
           layerRef.current.setBars(barsRef.current);
+          if (bars.length !== barsRef.current.length) drawRef.current.setBars(barsRef.current); // vela nueva
           if (!hoverRef.current) setIndLegend(layerRef.current.legend(null));
           setLast(c);
         });
@@ -156,6 +194,7 @@ export default function Chart({ symbol, interval, indicators }) {
     };
   }, [symbol, interval]);
 
+  const selected = drawings.find((d) => d.id === selectedId);
   const shown = legend || last;
   const change = shown ? ((shown.close - shown.open) / shown.open) * 100 : 0;
   const isStock = parseId(symbol).market === 'stock';
@@ -164,7 +203,10 @@ export default function Chart({ symbol, interval, indicators }) {
     <div className="chart-wrap">
       <div className="legend">
         <strong>{pairLabel(symbol)}</strong>
-        <span className="badge">{isStock ? 'Acción EE.UU.' : 'Cripto'}</span>
+        {meta.name && <span className="muted name">{meta.name}</span>}
+        <span className="badge">
+          {isStock ? 'Acción' : 'Cripto'} · {sourceLabel(symbol, meta.exchange)}
+        </span>
         <span className="muted">{interval}</span>
         {shown && (
           <span className={change >= 0 ? 'up' : 'down'}>
@@ -188,14 +230,36 @@ export default function Chart({ symbol, interval, indicators }) {
           ))}
         </div>
       )}
-      <div ref={containerRef} className="chart" />
-      {status === 'loading' && <div className="overlay">Cargando {pairLabel(symbol)}…</div>}
-      {status === 'error' && (
-        <div className="overlay error">
-          No se pudieron cargar los datos de {pairLabel(symbol)}.<br />
-          <small>{error}</small>
+      <div className="chart-body">
+        <DrawingToolbar
+          tool={tool}
+          onTool={setTool}
+          magnet={magnet}
+          onMagnet={setMagnet}
+          hidden={hidden}
+          onHidden={setHidden}
+          count={drawings.length}
+          onClear={() => onDrawingsChange([])}
+        />
+        <div className="chart-area">
+          <div ref={containerRef} className="chart" />
+          {selected && (
+            <DrawingEditBar
+              drawing={selected}
+              onUpdate={(patch) => onDrawingsChange(drawings.map((d) => (d.id === selected.id ? { ...d, ...patch } : d)))}
+              onDelete={() => drawRef.current.remove(selected.id)}
+            />
+          )}
+          {tool !== 'cursor' && <div className="draw-hint">{TOOL_HINT[tool] || 'Hacé clic en el gráfico'} · Esc para cancelar</div>}
+          {status === 'loading' && <div className="overlay">Cargando {pairLabel(symbol)}…</div>}
+          {status === 'error' && (
+            <div className="overlay error">
+              No se pudieron cargar los datos de {pairLabel(symbol)}.<br />
+              <small>{error}</small>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

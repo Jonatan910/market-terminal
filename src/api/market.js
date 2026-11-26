@@ -18,10 +18,18 @@ export function pairLabel(id) {
   return market === 'crypto' ? `${ticker.replace(/USDT$/, '')}/USDT` : ticker;
 }
 
-export const fetchCandles = (id, interval) => {
+// De dónde vienen los datos de cada símbolo (para mostrarlo en la lista y en el gráfico).
+export function sourceLabel(id, exchange) {
+  return parseId(id).market === 'crypto' ? 'Binance' : exchange || 'EE.UU.';
+}
+
+// Devuelve { bars, exchange?, name? }
+export async function fetchCandles(id, interval) {
   const { market, ticker } = parseId(id);
-  return market === 'crypto' ? fetchKlines(ticker, interval) : fetchStockCandles(ticker, interval);
-};
+  if (market === 'crypto') return { bars: await fetchKlines(ticker, interval) };
+  const d = await fetchStockCandles(ticker, interval);
+  return { bars: d.bars, exchange: d.exchange, name: d.name };
+}
 
 // Escucha la vela actual en vivo. Llama a onCandle(vela) en cada actualización.
 // Devuelve una función para dejar de escuchar.
@@ -38,7 +46,7 @@ export function subscribeCandles(id, interval, onCandle) {
   const timer = setInterval(async () => {
     if (document.hidden) return; // pestaña en segundo plano: no gastar pedidos
     try {
-      const bars = await fetchStockCandles(ticker, interval);
+      const { bars } = await fetchStockCandles(ticker, interval);
       if (!stop) bars.slice(-2).forEach(onCandle);
     } catch {
       /* se reintenta en el próximo ciclo */

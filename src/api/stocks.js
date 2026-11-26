@@ -9,8 +9,9 @@ async function getJson(path) {
   return body;
 }
 
+// Devuelve { bars, name, exchange, ... }
 export const fetchStockCandles = (symbol, interval) =>
-  getJson(`/candles?symbol=${encodeURIComponent(symbol)}&interval=${interval}`).then((d) => d.bars);
+  getJson(`/candles?symbol=${encodeURIComponent(symbol)}&interval=${interval}`);
 
 export const fetchStockQuotes = (symbols) =>
   symbols.length ? getJson(`/quotes?symbols=${symbols.map(encodeURIComponent).join(',')}`) : Promise.resolve([]);

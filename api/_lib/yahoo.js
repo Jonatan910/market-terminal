@@ -46,6 +46,13 @@ export function cleanSymbol(s) {
   return sym;
 }
 
+// Código de bolsa de Yahoo -> nombre conocido.
+const EXCHANGES = {
+  NMS: 'Nasdaq', NGM: 'Nasdaq', NCM: 'Nasdaq', NAS: 'Nasdaq',
+  NYQ: 'NYSE', NYS: 'NYSE', PCX: 'NYSE Arca', ASE: 'NYSE American', BTS: 'Cboe',
+};
+export const exchangeLabel = (code) => EXCHANGES[code] || code || '';
+
 // ---------- velas ----------
 // Temporalidad de la app -> qué pedirle a Yahoo. Yahoo limita cuánta historia da por intervalo
 // (1m: 7 días, 5m/15m: 60 días, 60m: 730 días). 4h no existe en Yahoo: se arma juntando velas de 1h.
@@ -78,7 +85,7 @@ export async function candles(symbol, interval) {
       bars.push({ time: r.timestamp[i], open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] || 0 });
     }
     if (cfg.group) bars = groupBars(bars, cfg.group, r.meta.gmtoffset || 0);
-    return { symbol: r.meta.symbol, name: r.meta.longName || r.meta.shortName || r.meta.symbol, currency: r.meta.currency, exchange: r.meta.exchangeName, bars };
+    return { symbol: r.meta.symbol, name: r.meta.longName || r.meta.shortName || r.meta.symbol, currency: r.meta.currency, exchange: exchangeLabel(r.meta.exchangeName), bars };
   });
 }
 
@@ -120,6 +127,8 @@ export async function quote(symbol) {
     const now = Date.now() / 1000;
     return {
       symbol: m.symbol,
+      name: m.longName || m.shortName || m.symbol,
+      exchange: exchangeLabel(m.exchangeName),
       price,
       change: yesterday ? ((price - yesterday) / yesterday) * 100 : 0,
       open: t ? now >= t.start && now < t.end : null, // ¿el mercado está abierto ahora?
@@ -138,6 +147,6 @@ export async function search(q) {
     return (data.quotes || [])
       .filter((x) => (x.quoteType === 'EQUITY' || x.quoteType === 'ETF') && US_EXCHANGES.has(x.exchange))
       .slice(0, 8)
-      .map((x) => ({ symbol: x.symbol, name: x.shortname || x.longname || x.symbol, exchange: x.exchDisp || x.exchange, type: x.quoteType }));
+      .map((x) => ({ symbol: x.symbol, name: x.shortname || x.longname || x.symbol, exchange: exchangeLabel(x.exchange), type: x.quoteType }));
   });
 }

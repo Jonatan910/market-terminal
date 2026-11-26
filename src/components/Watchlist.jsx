@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetch24h, openStream } from '../api/binance';
 import { fetchStockQuotes, STOCK_REFRESH_MS } from '../api/stocks';
-import { displayName, parseId } from '../api/market';
+import { displayName, pairLabel, parseId, sourceLabel } from '../api/market';
 import { formatPercent, formatPrice } from '../format';
 
 // Lista de seguimiento: precio y variación de cada símbolo, en vivo.
@@ -71,16 +71,16 @@ export default function Watchlist({ symbols, active, onSelect, onRemove }) {
       {symbols.map((id) => {
         const q = quotes[id];
         const isStock = parseId(id).market === 'stock';
+        // Segundo renglón: "BTC/USDT · Binance" o "Nasdaq · cerrado".
+        const sub = isStock
+          ? [sourceLabel(id, q?.exchange), q?.open === false && 'cerrado'].filter(Boolean).join(' · ')
+          : `${pairLabel(id)} · ${sourceLabel(id)}`;
         return (
           <li key={id} className={id === active ? 'active' : ''}>
-            <button className="row" onClick={() => onSelect(id)}>
+            <button className="row" onClick={() => onSelect(id)} title={q?.name || pairLabel(id)}>
               <span className="sym">
-                {displayName(id)}
-                {isStock && q && q.open === false && (
-                  <span className="closed" title="Mercado cerrado">
-                    cerrado
-                  </span>
-                )}
+                <strong>{displayName(id)}</strong>
+                <span className="sub">{sub}</span>
               </span>
               <span className={`price ${flash[id] || ''}`}>{q ? formatPrice(q.price) : '…'}</span>
               <span className={`chg ${q && q.change >= 0 ? 'up' : 'down'}`}>{q ? formatPercent(q.change) : ''}</span>

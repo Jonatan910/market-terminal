@@ -19,6 +19,8 @@ const DEFAULT_WATCHLIST = [
   'stock:TSLA',
 ];
 
+const NO_DRAWINGS = [];
+
 // Listas guardadas con la versión anterior ("BTCUSDT") pasan a "crypto:BTCUSDT".
 const normalize = (id) => (id.includes(':') ? id : `crypto:${id}`);
 
@@ -28,11 +30,19 @@ export default function App() {
   const [interval, setTimeframe] = useLocalStorage('mt.interval', '4h');
   const [savedList, setWatchlist] = useLocalStorage('mt.watchlist', DEFAULT_WATCHLIST);
   const [savedIndicators, setIndicators] = useLocalStorage('mt.indicators', defaultIndicators);
+  const [allDrawings, setAllDrawings] = useLocalStorage('mt.drawings', {}); // { 'crypto:BTCUSDT': [dibujos] }
 
   const symbol = normalize(savedSymbol);
   const watchlist = useMemo(() => savedList.map(normalize), [savedList]);
   // Descarta indicadores guardados que ya no existan en el catálogo.
   const indicators = useMemo(() => savedIndicators.filter((i) => INDICATORS[i.type]), [savedIndicators]);
+
+  // Dibujos del símbolo actual (cada símbolo tiene los suyos, en todas las temporalidades).
+  const drawings = allDrawings[symbol] || NO_DRAWINGS;
+  const setDrawings = useCallback(
+    (list) => setAllDrawings((all) => ({ ...all, [symbol]: list })),
+    [symbol, setAllDrawings],
+  );
 
   // Elegir en el buscador: abre el gráfico y lo suma a la lista si no estaba.
   const pick = useCallback(
@@ -68,7 +78,7 @@ export default function App() {
 
       <main className="layout">
         <section className="main-chart">
-          <Chart symbol={symbol} interval={interval} indicators={indicators} />
+          <Chart symbol={symbol} interval={interval} indicators={indicators} drawings={drawings} onDrawingsChange={setDrawings} />
         </section>
         <aside className="side">
           <h2>Lista de seguimiento</h2>

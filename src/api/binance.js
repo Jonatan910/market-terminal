@@ -80,7 +80,10 @@ export function openStream(streams, onMessage) {
   if (streams.length) connect();
   return () => {
     closed = true;
-    ws?.close();
+    if (!ws) return;
+    // Cerrar una conexión que todavía se está abriendo genera un error en la consola: esperamos a que abra.
+    if (ws.readyState === WebSocket.CONNECTING) ws.onopen = () => ws.close();
+    else ws.close();
   };
 }
 

@@ -13,9 +13,13 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 - Gráfico de velas con volumen, actualizado en tiempo real por WebSocket.
 - Buscador de cripto y acciones (BTC, AAPL, NVDA, QQQ…), navegable con el teclado.
 - Temporalidades: 1m, 5m, 15m, 1h, 4h, 1D y 1S.
-- Lista de seguimiento mixta: precio y variación (24 h en cripto, del día en acciones) y aviso de mercado cerrado.
+- Lista de seguimiento mixta: par, fuente de datos (Binance, Nasdaq, NYSE…), precio, variación y aviso de mercado cerrado.
 - Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI y MACD en paneles propios.
   Se pueden agregar varias veces (por ejemplo EMA 20 y EMA 50), cambiar sus valores y su color.
+- Herramientas de dibujo: línea de tendencia, rayo, línea extendida, línea y rayo horizontal, línea vertical,
+  rectángulo, retroceso de Fibonacci, medición de precio y texto. Se pueden seleccionar, mover, cambiar de
+  color, grosor y tipo de línea, y borrar (tecla Supr). Imán para pegarse a los precios de las velas.
+  Cada símbolo guarda sus dibujos y se ven en todas las temporalidades.
 - Fechas y horas en la zona horaria de tu compu.
 - Recuerda el símbolo, la temporalidad y la lista en el navegador.
 - Se adapta al celular.
@@ -76,6 +80,11 @@ src/
   components/Watchlist.jsx lista de seguimiento en vivo
   components/SymbolSearch.jsx buscador de símbolos
   components/IndicatorsPanel.jsx panel para agregar y configurar indicadores
+  components/DrawingToolbar.jsx barra de herramientas de dibujo
+  components/DrawingEditBar.jsx barra para editar el dibujo seleccionado
+  drawings/tools.js        cada herramienta: cómo se dibuja y cómo se selecciona
+  drawings/controller.js   mouse/dedo: crear, seleccionar, mover y borrar dibujos
+  drawings/timeMap.js      convierte fecha <-> posición de vela (con pruebas)
   indicators/calc.js       cálculos (SMA, EMA, Bollinger, RSI, MACD)
   indicators/calc.test.js  pruebas de los cálculos (npm test)
   indicators/catalog.js    lista de indicadores: parámetros y cómo se dibujan
@@ -88,6 +97,7 @@ src/
 ## Próximos pasos
 
 - Más indicadores: VWAP, Estocástico, ATR, Ichimoku.
-- Herramientas de dibujo y alertas de precio.
+- Alertas de precio.
+- Más herramientas de dibujo: canal paralelo, posición larga/corta.
 
 Los datos son de Binance y Yahoo Finanzas y pueden tener demoras. No es asesoramiento financiero.
