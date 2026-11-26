@@ -1,5 +1,7 @@
 # Market Terminal
 
+**Demo en vivo:** https://market-terminal-orpin.vercel.app/
+
 Terminal de mercados hecha con **React**, **Vite** y **Lightweight Charts**.
 Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 
