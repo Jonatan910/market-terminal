@@ -241,6 +241,10 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
         drawRef.current.setMarket(market);
         setAll();
         setIndLegend(layerRef.current.legend(null));
+        // Símbolo o temporalidad nuevos: la escala de precios vuelve a ser automática en todos
+        // los paneles. Si antes arrastraste el eje, la librería la deja apagada y el gráfico
+        // nuevo quedaría con la escala del anterior (por ejemplo DOT con la escala de BTC).
+        chartRef.current.panes().forEach((_, i) => chartRef.current.priceScale('right', i).applyOptions({ autoScale: true }));
         // Se muestran las últimas velas (como en otras plataformas); el resto, desplazando.
         const n = candles.length;
         chartRef.current.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - VISIBLE_BARS), to: n + 5 });
