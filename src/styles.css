@@ -1,0 +1,128 @@
+:root {
+  --bg: #0b0e14;
+  --panel: #121722;
+  --panel-2: #181e2b;
+  --border: #232a3a;
+  --text: #e6e9ef;
+  --muted: #8b95a7;
+  --accent: #4c8dff;
+  --up: #26a69a;
+  --down: #ef5350;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+.muted { color: var(--muted); }
+.up { color: var(--up); }
+.down { color: var(--down); }
+
+.app { display: flex; flex-direction: column; height: 100%; }
+
+/* ---------- barra superior ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-wrap: wrap;
+}
+
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; white-space: nowrap; }
+.logo {
+  width: 18px; height: 18px; border-radius: 4px;
+  background: linear-gradient(135deg, var(--up), var(--accent));
+}
+
+.search { position: relative; flex: 1 1 200px; max-width: 320px; }
+.search input {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.search input:focus { outline: none; border-color: var(--accent); }
+
+.results {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 10;
+  margin: 0; padding: 4px; list-style: none;
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 8px 24px #0008;
+}
+.results button { display: flex; gap: 2px; width: 100%; padding: 6px 8px; border-radius: 4px; text-align: left; }
+.results button.hl { background: var(--border); }
+.results.none { padding: 8px 12px; color: var(--muted); }
+
+.timeframes { display: flex; gap: 2px; overflow-x: auto; }
+.timeframes button { padding: 5px 9px; border-radius: 5px; color: var(--muted); }
+.timeframes button:hover { color: var(--text); background: var(--panel-2); }
+.timeframes button.active { color: var(--text); background: var(--accent); }
+
+/* ---------- gráfico + lista ---------- */
+.layout { flex: 1; display: grid; grid-template-columns: 1fr 280px; min-height: 0; }
+
+.main-chart { min-width: 0; min-height: 0; }
+.chart-wrap { position: relative; height: 100%; display: flex; flex-direction: column; }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; padding: 8px 16px; font-size: 13px; }
+.legend strong { font-size: 15px; }
+.chart { flex: 1; min-height: 0; }
+
+.overlay {
+  position: absolute; inset: 40px 0 0 0;
+  display: grid; place-items: center; text-align: center;
+  color: var(--muted); background: #0b0e14aa;
+}
+.overlay.error { color: var(--down); }
+
+.side { border-left: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
+.side h2 {
+  margin: 0; padding: 10px 16px;
+  font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); border-bottom: 1px solid var(--border);
+}
+
+.watchlist { list-style: none; margin: 0; padding: 0; }
+.watchlist li { display: flex; align-items: center; border-bottom: 1px solid var(--border); }
+.watchlist li.active { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--accent); }
+.watchlist .row {
+  flex: 1; display: grid; grid-template-columns: 1fr auto 64px; gap: 8px;
+  padding: 9px 4px 9px 16px; text-align: left;
+}
+.watchlist .row:hover { background: var(--panel-2); }
+.watchlist .sym { font-weight: 600; }
+.watchlist .price { text-align: right; transition: color .3s; }
+.watchlist .price.up { color: var(--up); }
+.watchlist .price.down { color: var(--down); }
+.watchlist .chg { text-align: right; }
+.watchlist .remove { width: 32px; align-self: stretch; color: var(--muted); font-size: 18px; opacity: 0; }
+.watchlist li:hover .remove, .watchlist .remove:focus-visible { opacity: 1; }
+.watchlist .remove:hover { color: var(--down); }
+.watchlist .empty { padding: 16px; color: var(--muted); }
+
+.footer { padding: 6px 16px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); }
+
+/* ---------- celular ---------- */
+@media (max-width: 760px) {
+  .topbar { padding: 8px 16px; }
+  .search { max-width: none; order: 3; flex-basis: 100%; }
+  .app { height: auto; min-height: 100%; } /* en el celular la página scrollea normal */
+  .layout { flex: none; grid-template-columns: 1fr; grid-template-rows: 60vh auto; }
+  .side { border-left: 0; border-top: 1px solid var(--border); overflow: visible; }
+  .watchlist .remove { opacity: 1; } /* en el celular no hay "hover" */
+}
