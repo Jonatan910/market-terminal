@@ -1,27 +1,60 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchUsdtSymbols } from '../api/binance';
+import { searchStocks } from '../api/stocks';
 
-// Buscador: escribís "sol" y te sugiere SOLUSDT. Enter abre el primero.
+// Buscador de cripto y acciones: escribís "sol" o "apple" y sugiere resultados de los dos mercados.
 export default function SymbolSearch({ onPick }) {
-  const [all, setAll] = useState([]);
+  const [cryptoList, setCryptoList] = useState([]);
+  const [stockResults, setStockResults] = useState([]);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const boxRef = useRef(null);
 
-  // La lista de pares se pide una sola vez, la primera vez que tocás el buscador.
+  // La lista de pares cripto se pide una sola vez, la primera vez que tocás el buscador.
   function loadOnce() {
-    if (!all.length) fetchUsdtSymbols().then(setAll).catch(() => {});
+    if (!cryptoList.length) fetchUsdtSymbols().then(setCryptoList).catch(() => {});
   }
 
+  // Acciones: se buscan en el servidor, esperando 250 ms a que termines de escribir ("debounce").
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) return setStockResults([]);
+    let cancelled = false;
+    const id = setTimeout(() => {
+      searchStocks(q)
+        .then((r) => !cancelled && setStockResults(r))
+        .catch(() => !cancelled && setStockResults([]));
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [query]);
+
   const results = useMemo(() => {
-    const q = query.trim().toUpperCase().replace(/[\/\s-]/g, '').replace(/USDT$/, '');
+    const q = query.trim().toUpperCase().replace(/[/\s-]/g, '').replace(/USDT$/, '');
     if (!q) return [];
-    // Primero los que empiezan con lo escrito, después los que lo contienen.
-    const starts = all.filter((s) => s.base.startsWith(q));
-    const contains = all.filter((s) => !s.base.startsWith(q) && s.base.includes(q));
-    return [...starts.sort((a, b) => a.base.length - b.base.length), ...contains].slice(0, 8);
-  }, [all, query]);
+    // Cripto: primero los que empiezan con lo escrito, después los que lo contienen.
+    const starts = cryptoList.filter((s) => s.base.startsWith(q)).sort((a, b) => a.base.length - b.base.length);
+    const contains = cryptoList.filter((s) => !s.base.startsWith(q) && s.base.includes(q));
+    const crypto = [...starts, ...contains].slice(0, 5).map((s) => ({
+      id: `crypto:${s.symbol}`,
+      title: s.base,
+      subtitle: `${s.base}/USDT`,
+      tag: 'Cripto',
+      exact: s.base === q,
+    }));
+    const stocks = stockResults.slice(0, 6).map((s) => ({
+      id: `stock:${s.symbol}`,
+      title: s.symbol,
+      subtitle: `${s.name} · ${s.exchange}`,
+      tag: s.type === 'ETF' ? 'ETF' : 'Acción',
+      exact: s.symbol === q,
+    }));
+    // Las coincidencias exactas van primero (escribir "AAPL" o "BTC" y Enter abre ese).
+    return [...crypto, ...stocks].sort((a, b) => b.exact - a.exact);
+  }, [cryptoList, stockResults, query]);
 
   // Cerrar la lista al hacer clic afuera.
   useEffect(() => {
@@ -30,8 +63,8 @@ export default function SymbolSearch({ onPick }) {
     return () => document.removeEventListener('pointerdown', onDoc);
   }, []);
 
-  function pick(symbol) {
-    onPick(symbol);
+  function pick(id) {
+    onPick(id);
     setQuery('');
     setOpen(false);
   }
@@ -39,7 +72,7 @@ export default function SymbolSearch({ onPick }) {
   function onKeyDown(e) {
     if (e.key === 'ArrowDown') setHighlight((h) => Math.min(h + 1, results.length - 1));
     else if (e.key === 'ArrowUp') setHighlight((h) => Math.max(h - 1, 0));
-    else if (e.key === 'Enter' && results[highlight]) pick(results[highlight].symbol);
+    else if (e.key === 'Enter' && results[highlight]) pick(results[highlight].id);
     else if (e.key === 'Escape') setOpen(false);
     else return;
     e.preventDefault();
@@ -49,7 +82,7 @@ export default function SymbolSearch({ onPick }) {
     <div className="search" ref={boxRef}>
       <input
         type="search"
-        placeholder="Buscar: BTC, ETH, SOL…"
+        placeholder="Buscar: BTC, AAPL, NVDA, QQQ…"
         value={query}
         onFocus={() => {
           loadOnce();
@@ -66,16 +99,18 @@ export default function SymbolSearch({ onPick }) {
       {open && results.length > 0 && (
         <ul className="results" role="listbox">
           {results.map((r, i) => (
-            <li key={r.symbol}>
-              <button className={i === highlight ? 'hl' : ''} onMouseEnter={() => setHighlight(i)} onClick={() => pick(r.symbol)}>
-                <strong>{r.base}</strong>
-                <span className="muted">/USDT</span>
+            <li key={r.id}>
+              <button className={i === highlight ? 'hl' : ''} onMouseEnter={() => setHighlight(i)} onClick={() => pick(r.id)}>
+                <span className="r-main">
+                  <strong>{r.title}</strong>
+                  <span className="muted r-sub">{r.subtitle}</span>
+                </span>
+                <span className="tag">{r.tag}</span>
               </button>
             </li>
           ))}
         </ul>
       )}
-      {open && query && !results.length && all.length > 0 && <div className="results none">Sin resultados</div>}
     </div>
   );
 }

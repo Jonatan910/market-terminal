@@ -126,3 +126,14 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .side { border-left: 0; border-top: 1px solid var(--border); overflow: visible; }
   .watchlist .remove { opacity: 1; } /* en el celular no hay "hover" */
 }
+
+/* ---------- mercados (cripto / acciones) ---------- */
+.badge, .tag {
+  padding: 1px 6px; border-radius: 4px;
+  font-size: 11px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border);
+}
+.results button { justify-content: space-between; align-items: center; gap: 8px; }
+.r-main { display: flex; flex-direction: column; min-width: 0; }
+.r-sub { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watchlist .sym { display: flex; align-items: center; gap: 6px; }
+.watchlist .closed { font-size: 10px; font-weight: 400; color: var(--muted); }

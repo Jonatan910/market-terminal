@@ -1,45 +1,63 @@
 import { useEffect, useState } from 'react';
 import { fetch24h, openStream } from '../api/binance';
+import { fetchStockQuotes, STOCK_REFRESH_MS } from '../api/stocks';
+import { displayName, parseId } from '../api/market';
 import { formatPercent, formatPrice } from '../format';
 
-// Lista de seguimiento: precio y variación de 24 h de cada símbolo, en vivo.
+// Lista de seguimiento: precio y variación de cada símbolo, en vivo.
+// Cripto: variación de 24 h por WebSocket. Acciones: variación del día, cada 15 s.
 export default function Watchlist({ symbols, active, onSelect, onRemove }) {
-  const [tickers, setTickers] = useState({}); // { BTCUSDT: { price, change } }
-  const [flash, setFlash] = useState({}); // { BTCUSDT: 'up' | 'down' } para el destello al cambiar
+  const [quotes, setQuotes] = useState({}); // { 'crypto:BTCUSDT': { price, change, open? } }
+  const [flash, setFlash] = useState({}); // { id: 'up' | 'down' } para el destello al cambiar
 
+  // Guarda una cotización nueva y marca el destello si el precio cambió.
+  function apply(id, q) {
+    setQuotes((prev) => {
+      const old = prev[id];
+      if (old && old.price !== q.price) setFlash((f) => ({ ...f, [id]: q.price > old.price ? 'up' : 'down' }));
+      return { ...prev, [id]: q };
+    });
+  }
+
+  const key = symbols.join(','); // para que el efecto solo se repita si cambia la lista
+
+  // ---------- cripto ----------
   useEffect(() => {
+    const tickers = symbols.map(parseId).filter((s) => s.market === 'crypto').map((s) => s.ticker);
+    if (!tickers.length) return;
     let cancelled = false;
 
-    // Foto inicial con una sola llamada.
-    fetch24h(symbols)
-      .then((rows) => {
-        if (cancelled) return;
-        const next = {};
-        for (const r of rows) next[r.symbol] = fromTicker(r.lastPrice, r.openPrice);
-        setTickers(next);
-      })
+    fetch24h(tickers)
+      .then((rows) => !cancelled && rows.forEach((r) => apply(`crypto:${r.symbol}`, fromTicker(r.lastPrice, r.openPrice))))
       .catch(() => {});
 
-    // Después, actualizaciones en vivo con el stream "miniTicker" (una por segundo).
     const close = openStream(
-      symbols.map((s) => `${s.toLowerCase()}@miniTicker`),
-      (t) => {
-        setTickers((prev) => {
-          const old = prev[t.s];
-          const now = fromTicker(t.c, t.o);
-          if (old && old.price !== now.price) {
-            setFlash((f) => ({ ...f, [t.s]: now.price > old.price ? 'up' : 'down' }));
-          }
-          return { ...prev, [t.s]: now };
-        });
-      },
+      tickers.map((t) => `${t.toLowerCase()}@miniTicker`),
+      (t) => apply(`crypto:${t.s}`, fromTicker(t.c, t.o)),
     );
-
     return () => {
       cancelled = true;
       close();
     };
-  }, [symbols]);
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---------- acciones ----------
+  useEffect(() => {
+    const tickers = symbols.map(parseId).filter((s) => s.market === 'stock').map((s) => s.ticker);
+    if (!tickers.length) return;
+    let cancelled = false;
+
+    const load = () =>
+      fetchStockQuotes(tickers)
+        .then((rows) => !cancelled && rows.forEach((r) => apply(`stock:${r.symbol}`, r)))
+        .catch(() => {});
+    load();
+    const timer = setInterval(() => !document.hidden && load(), STOCK_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apaga el destello un instante después.
   useEffect(() => {
@@ -50,16 +68,24 @@ export default function Watchlist({ symbols, active, onSelect, onRemove }) {
 
   return (
     <ul className="watchlist">
-      {symbols.map((s) => {
-        const t = tickers[s];
+      {symbols.map((id) => {
+        const q = quotes[id];
+        const isStock = parseId(id).market === 'stock';
         return (
-          <li key={s} className={s === active ? 'active' : ''}>
-            <button className="row" onClick={() => onSelect(s)}>
-              <span className="sym">{s.replace(/USDT$/, '')}</span>
-              <span className={`price ${flash[s] || ''}`}>{t ? formatPrice(t.price) : '…'}</span>
-              <span className={`chg ${t && t.change >= 0 ? 'up' : 'down'}`}>{t ? formatPercent(t.change) : ''}</span>
+          <li key={id} className={id === active ? 'active' : ''}>
+            <button className="row" onClick={() => onSelect(id)}>
+              <span className="sym">
+                {displayName(id)}
+                {isStock && q && q.open === false && (
+                  <span className="closed" title="Mercado cerrado">
+                    cerrado
+                  </span>
+                )}
+              </span>
+              <span className={`price ${flash[id] || ''}`}>{q ? formatPrice(q.price) : '…'}</span>
+              <span className={`chg ${q && q.change >= 0 ? 'up' : 'down'}`}>{q ? formatPercent(q.change) : ''}</span>
             </button>
-            <button className="remove" title={`Quitar ${s}`} aria-label={`Quitar ${s}`} onClick={() => onRemove(s)}>
+            <button className="remove" title={`Quitar ${displayName(id)}`} aria-label={`Quitar ${displayName(id)}`} onClick={() => onRemove(id)}>
               ×
             </button>
           </li>

@@ -1,28 +1,47 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import Chart from './components/Chart';
 import Watchlist from './components/Watchlist';
 import SymbolSearch from './components/SymbolSearch';
 import { TIMEFRAMES } from './api/binance';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
-const DEFAULT_WATCHLIST = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'BNBUSDT', 'DOGEUSDT', 'LINKUSDT', 'AVAXUSDT'];
+// Cada símbolo es "mercado:ticker".
+const DEFAULT_WATCHLIST = [
+  'crypto:BTCUSDT',
+  'crypto:ETHUSDT',
+  'crypto:SOLUSDT',
+  'stock:QQQ',
+  'stock:AAPL',
+  'stock:NVDA',
+  'stock:MSFT',
+  'stock:TSLA',
+];
+
+// Listas guardadas con la versión anterior ("BTCUSDT") pasan a "crypto:BTCUSDT".
+const normalize = (id) => (id.includes(':') ? id : `crypto:${id}`);
 
 export default function App() {
   // Todo se recuerda en el navegador: al volver a entrar, está como lo dejaste.
-  const [symbol, setSymbol] = useLocalStorage('mt.symbol', 'BTCUSDT');
+  const [savedSymbol, setSymbol] = useLocalStorage('mt.symbol', 'crypto:BTCUSDT');
   const [interval, setTimeframe] = useLocalStorage('mt.interval', '4h');
-  const [watchlist, setWatchlist] = useLocalStorage('mt.watchlist', DEFAULT_WATCHLIST);
+  const [savedList, setWatchlist] = useLocalStorage('mt.watchlist', DEFAULT_WATCHLIST);
+
+  const symbol = normalize(savedSymbol);
+  const watchlist = useMemo(() => savedList.map(normalize), [savedList]);
 
   // Elegir en el buscador: abre el gráfico y lo suma a la lista si no estaba.
   const pick = useCallback(
-    (s) => {
-      setSymbol(s);
-      setWatchlist((w) => (w.includes(s) ? w : [...w, s]));
+    (id) => {
+      setSymbol(id);
+      setWatchlist((w) => {
+        const list = w.map(normalize);
+        return list.includes(id) ? list : [...list, id];
+      });
     },
     [setSymbol, setWatchlist],
   );
 
-  const remove = useCallback((s) => setWatchlist((w) => w.filter((x) => x !== s)), [setWatchlist]);
+  const remove = useCallback((id) => setWatchlist((w) => w.map(normalize).filter((x) => x !== id)), [setWatchlist]);
 
   return (
     <div className="app">
@@ -51,7 +70,9 @@ export default function App() {
         </aside>
       </main>
 
-      <footer className="footer">Datos públicos de Binance · No es asesoramiento financiero</footer>
+      <footer className="footer">
+        Cripto: Binance, en vivo · Acciones: Yahoo Finanzas, cada 15 s · No es asesoramiento financiero
+      </footer>
     </div>
   );
 }
