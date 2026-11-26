@@ -12,6 +12,7 @@ import { DEFAULT_FAVORITES } from '../drawings/tools';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const UP = '#26a69a';
+const VOLUME_COLOR = 'rgba(76, 141, 255, 0.45)'; // volumen: un solo color azul, semitransparente
 const DOWN = '#ef5350';
 const INTRADAY = new Set(['1m', '5m', '15m', '1h', '4h']);
 
@@ -139,6 +140,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
 
     // El volumen va en su propia escala, ocupando el 20 % inferior.
     volumeRef.current = chart.addSeries(HistogramSeries, {
+      color: VOLUME_COLOR,
       priceFormat: { type: 'volume' },
       priceScaleId: 'volume',
     });
@@ -228,7 +230,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     setStatus('loading');
     setLegend(null);
 
-    const volBar = (c) => ({ time: c.time, value: c.volume, color: c.close >= c.open ? UP + '66' : DOWN + '66' });
+    const volBar = (c) => ({ time: c.time, value: c.volume });
 
     // Dibuja todas las velas de barsRef (al cargar y al sumar historia vieja).
     function setAll() {
