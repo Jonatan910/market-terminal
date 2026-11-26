@@ -6,6 +6,9 @@ import { createIndicatorLayer } from '../indicators/layer';
 import { createDrawingController } from '../drawings/controller';
 import DrawingToolbar from './DrawingToolbar';
 import DrawingEditBar from './DrawingEditBar';
+import FavoritesBar from './FavoritesBar';
+import { DEFAULT_FAVORITES } from '../drawings/tools';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const UP = '#26a69a';
 const DOWN = '#ef5350';
@@ -67,6 +70,12 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
   const [magnet, setMagnet] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  // Barra de favoritos: qué herramientas tiene, si se ve y dónde está (se recuerda).
+  const [favorites, setFavorites] = useLocalStorage('mt.favTools', DEFAULT_FAVORITES);
+  // En el celular arranca oculta (tapa mucho gráfico); se muestra con la ★ de la barra izquierda.
+  const [favBar, setFavBar] = useLocalStorage('mt.favBar', () => window.innerWidth > 760);
+  const [favPos, setFavPos] = useLocalStorage('mt.favPos', null);
+  const toggleFavorite = (id) => setFavorites((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [error, setError] = useState('');
   const [legend, setLegend] = useState(null); // vela bajo el cursor
@@ -147,10 +156,19 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
   }, [indicators]);
 
   // Dibujos y opciones de dibujo -> controlador.
-  useEffect(() => drawRef.current.setDrawings(drawings), [drawings]);
-  useEffect(() => drawRef.current.setTool(tool), [tool]);
-  useEffect(() => drawRef.current.setMagnet(magnet), [magnet]);
-  useEffect(() => drawRef.current.setHidden(hidden), [hidden]);
+  // Ojo: con llaves, para que el efecto no devuelva nada (React toma lo que devuelve como "limpieza").
+  useEffect(() => {
+    drawRef.current.setDrawings(drawings);
+  }, [drawings]);
+  useEffect(() => {
+    drawRef.current.setTool(tool);
+  }, [tool]);
+  useEffect(() => {
+    drawRef.current.setMagnet(magnet);
+  }, [magnet]);
+  useEffect(() => {
+    drawRef.current.setHidden(hidden);
+  }, [hidden]);
 
   // 3) Cada vez que cambia el símbolo o la temporalidad: cargar historial y escuchar en vivo.
   useEffect(() => {
@@ -263,9 +281,14 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
           onHidden={setHidden}
           count={drawings.length}
           onClear={() => onDrawingsChange([])}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+          favBar={favBar}
+          onFavBar={setFavBar}
         />
         <div className="chart-area">
           <div ref={containerRef} className="chart" />
+          {favBar && <FavoritesBar favorites={favorites} tool={tool} onTool={setTool} position={favPos} onMove={setFavPos} />}
           {selected && (
             <DrawingEditBar
               drawing={selected}

@@ -28,7 +28,10 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 - Editar el dibujo seleccionado: color, grosor, tipo de línea, **extender a izquierda/derecha**
   (un rectángulo con las dos cruza todo el gráfico), texto, **duplicar** y borrar.
 - **Copiar y pegar** con Ctrl+C / Ctrl+V (también entre símbolos) y **Alt + arrastrar** para duplicar.
-- Imán, ocultar y borrar todos. Cada símbolo guarda sus dibujos y se ven en todas las temporalidades.
+- **Barra de favoritos** flotante y movible: se arma con la ☆ de cada herramienta en los menús.
+- **Imán**: pega los puntos al máximo, mínimo, apertura o cierre de la vela. Se activa con el botón
+  o manteniendo **Ctrl** (Cmd en Mac) mientras dibujás; un circulito muestra dónde se pega.
+- Ocultar y borrar todos. Cada símbolo guarda sus dibujos y se ven en todas las temporalidades.
 - Fechas y horas en la zona horaria de tu compu.
 - Recuerda el símbolo, la temporalidad y la lista en el navegador.
 - Se adapta al celular.
@@ -92,6 +95,7 @@ src/
   components/IndicatorsPanel.jsx panel para agregar y configurar indicadores
   components/DrawingToolbar.jsx barra de herramientas de dibujo
   components/DrawingEditBar.jsx barra para editar el dibujo seleccionado
+  components/FavoritesBar.jsx barra flotante de herramientas favoritas
   drawings/tools.js        cada herramienta: cómo se dibuja y cómo se selecciona
   drawings/controller.js   mouse/dedo: crear, seleccionar, mover y borrar dibujos
   drawings/timeMap.js      convierte fecha <-> posición de vela (con pruebas)

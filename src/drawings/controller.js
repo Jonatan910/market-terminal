@@ -28,6 +28,7 @@ export function createDrawingController({ chart, series, container, onChange, on
   let drag = null; // arrastre en curso
   let down = null; // dónde se apretó (para distinguir clic de arrastre)
   let lastClick = { t: 0, x: 0, y: 0 }; // para detectar doble clic
+  let snapMarker = null; // punto donde se está pegando el imán (se marca con un circulito)
   let requestUpdate = () => {};
 
   // ---------- conversión fecha/precio <-> píxeles ----------
@@ -64,6 +65,18 @@ export function createDrawingController({ chart, series, container, onChange, on
       );
     }
     return { time: map.toTime(logical), price };
+  }
+
+  // ¿Se pega a las velas ahora? El botón Imán lo deja fijo; mantener Ctrl (Cmd en Mac)
+  // lo activa mientras está apretado (o lo desactiva, si el imán ya estaba prendido).
+  const snapping = (ev) => magnet !== Boolean(ev.ctrlKey || ev.metaKey);
+
+  // Punto bajo el cursor (con imán si corresponde); marca el circulito del imán.
+  function pointAt(ev, pos) {
+    const snap = snapping(ev);
+    const pt = unproject(pos.x, pos.y, snap);
+    snapMarker = snap && pt ? pt : null;
+    return pt;
   }
 
   // Corre todos los puntos de un dibujo dL velas y dP de precio.
@@ -114,6 +127,18 @@ export function createDrawingController({ chart, series, container, onChange, on
           ctx.stroke();
         }
       }
+    }
+    // Imán: circulito en el precio de la vela donde se va a pegar el punto.
+    const m = snapMarker && project(snapMarker);
+    if (m) {
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(m.x, m.y, 4.5, 0, Math.PI * 2);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
@@ -175,6 +200,7 @@ export function createDrawingController({ chart, series, container, onChange, on
     const d = draft;
     draft = null;
     freehand = false;
+    snapMarker = null;
     lockChart(false);
     if (!d) return;
     // Un camino necesita al menos 2 puntos distintos; el pincel, al menos 2 puntos.
@@ -209,7 +235,7 @@ export function createDrawingController({ chart, series, container, onChange, on
     lastClick = { t: now, ...pos };
 
     if (tool !== 'cursor') {
-      const pt = unproject(pos.x, pos.y);
+      const pt = pointAt(ev, pos);
       if (!pt) return;
       lockChart(true);
       ev.preventDefault();
@@ -266,6 +292,7 @@ export function createDrawingController({ chart, series, container, onChange, on
   }
 
   function onPointerMove(ev) {
+    if (ev.type === 'pointermove') lastMove = { clientX: ev.clientX, clientY: ev.clientY };
     const pos = local(ev);
     if (down && Math.hypot(pos.x - down.x, pos.y - down.y) > 4) down.moved = true;
 
@@ -277,7 +304,7 @@ export function createDrawingController({ chart, series, container, onChange, on
           if (pt) draft.points.push(pt);
         }
       } else {
-        const pt = unproject(pos.x, pos.y);
+        const pt = pointAt(ev, pos);
         if (pt) draft.points[draft.points.length - 1] = pt;
       }
       requestUpdate();
@@ -288,7 +315,7 @@ export function createDrawingController({ chart, series, container, onChange, on
       const def = TOOLS[drag.original.type];
       let points;
       if (drag.handle != null) {
-        const pt = unproject(pos.x, pos.y);
+        const pt = pointAt(ev, pos);
         if (!pt) return;
         points = def.moveHandle
           ? def.moveHandle(drag.original, drag.handle, pt)
@@ -303,6 +330,14 @@ export function createDrawingController({ chart, series, container, onChange, on
       drawings = drawings.map((x) => (x.id === drag.id ? { ...x, points } : x));
       requestUpdate();
       return;
+    }
+
+    // Con una herramienta elegida (antes del primer clic), mostrar dónde pegaría el imán.
+    if (tool !== 'cursor') {
+      const had = snapMarker;
+      if (insidePane(pos)) pointAt(ev, pos);
+      else snapMarker = null;
+      if (had || snapMarker) requestUpdate();
     }
 
     // Cursor: manito sobre los dibujos.
@@ -326,8 +361,10 @@ export function createDrawingController({ chart, series, container, onChange, on
     }
     if (drag) {
       drag = null;
+      snapMarker = null;
       lockChart(false);
       commit();
+      requestUpdate();
     }
     down = null;
   }
@@ -335,11 +372,21 @@ export function createDrawingController({ chart, series, container, onChange, on
   function cancelDraft() {
     draft = null;
     freehand = false;
+    snapMarker = null;
     lockChart(false);
     requestUpdate();
   }
 
+  // Apretar o soltar Ctrl sin mover el mouse también prende/apaga el imán en el momento.
+  let lastMove = null;
+  function onModifier(ev) {
+    if ((ev.key === 'Control' || ev.key === 'Meta') && lastMove && (tool !== 'cursor' || draft || drag)) {
+      onPointerMove({ clientX: lastMove.clientX, clientY: lastMove.clientY, ctrlKey: ev.type === 'keydown', metaKey: false, altKey: false });
+    }
+  }
+
   function onKeyDown(ev) {
+    onModifier(ev);
     if (ev.target.closest?.('input, textarea, select')) return; // escribiendo en un campo
     const mod = ev.ctrlKey || ev.metaKey;
 
@@ -378,6 +425,7 @@ export function createDrawingController({ chart, series, container, onChange, on
   window.addEventListener('pointerup', onPointerUp);
   window.addEventListener('pointercancel', onPointerUp);
   window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onModifier);
 
   const api = {
     setDrawings(list) {
@@ -394,6 +442,7 @@ export function createDrawingController({ chart, series, container, onChange, on
       tool = t;
       if (draft) cancelDraft();
       if (t !== 'cursor' && selectedId) select(null);
+      snapMarker = null;
       container.style.cursor = t !== 'cursor' ? 'crosshair' : '';
       requestUpdate();
     },
@@ -439,6 +488,7 @@ export function createDrawingController({ chart, series, container, onChange, on
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onModifier);
     },
   };
   return api;

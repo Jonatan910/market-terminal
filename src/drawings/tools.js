@@ -569,5 +569,11 @@ export const TOOL_GROUPS = [
   { id: 'text', label: 'Texto', tools: ['text'] },
 ];
 
+// Favoritas por defecto (las de la barra de favoritos al empezar).
+export const DEFAULT_FAVORITES = [
+  'hray', 'brush', 'crossline', 'ray', 'vline', 'trend', 'rect', 'hline', 'short', 'long',
+  'range', 'path', 'arrow', 'fib', 'ellipse', 'elliott', 'triangle', 'xabcd', 'elliottabc', 'channel',
+];
+
 export const DEFAULT_STYLE = { color: '#4c8dff', width: 2, lineStyle: 'solid' };
 export const DRAW_COLORS = ['#4c8dff', '#26a69a', '#ef5350', '#f5c518', '#ff9800', '#e040fb', '#00bcd4', '#ffffff'];

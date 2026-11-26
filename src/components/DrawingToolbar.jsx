@@ -46,7 +46,7 @@ export function Icon({ name, size = 18 }) {
 
 // Barra de herramientas: cada grupo es un botón con la última herramienta usada
 // y una flechita que abre el menú con todas las del grupo.
-export default function DrawingToolbar({ tool, onTool, magnet, onMagnet, hidden, onHidden, count, onClear }) {
+export default function DrawingToolbar({ tool, onTool, magnet, onMagnet, hidden, onHidden, count, onClear, favorites, onToggleFavorite, favBar, onFavBar }) {
   const [current, setCurrent] = useState(() => Object.fromEntries(TOOL_GROUPS.map((g) => [g.id, g.tools[0]])));
   const [openGroup, setOpenGroup] = useState(null);
   const [menuTop, setMenuTop] = useState(null); // en el celular el menú va fijo debajo del botón
@@ -113,12 +113,26 @@ export default function DrawingToolbar({ tool, onTool, magnet, onMagnet, hidden,
               {openGroup === g.id && (
                 <div className="draw-menu" role="menu" aria-label={g.label} style={menuTop != null ? { top: menuTop } : undefined}>
                   <div className="draw-menu-title">{g.label}</div>
-                  {g.tools.map((t) => (
-                    <button key={t} role="menuitem" className={tool === t ? 'active' : ''} onClick={() => choose(t)}>
-                      <Icon name={t} />
-                      <span>{TOOLS[t].name}</span>
-                    </button>
-                  ))}
+                  {g.tools.map((t) => {
+                    const fav = favorites.includes(t);
+                    return (
+                      <div className={`draw-menu-row ${tool === t ? 'active' : ''}`} key={t}>
+                        <button role="menuitem" onClick={() => choose(t)}>
+                          <Icon name={t} />
+                          <span>{TOOLS[t].name}</span>
+                        </button>
+                        <button
+                          className={`star ${fav ? 'on' : ''}`}
+                          onClick={() => onToggleFavorite(t)}
+                          aria-pressed={fav}
+                          aria-label={fav ? `Quitar ${TOOLS[t].name} de favoritos` : `Agregar ${TOOLS[t].name} a favoritos`}
+                          title={fav ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                        >
+                          {fav ? '★' : '☆'}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -127,7 +141,10 @@ export default function DrawingToolbar({ tool, onTool, magnet, onMagnet, hidden,
       </div>
 
       <div className="draw-group">
-        <button className={magnet ? 'active' : ''} onClick={() => onMagnet(!magnet)} title="Imán: pegar a los precios de las velas" aria-label="Imán" aria-pressed={magnet}>
+        <button className={`fav-toggle ${favBar ? 'active' : ''}`} onClick={() => onFavBar(!favBar)} title={favBar ? 'Ocultar barra de favoritos' : 'Mostrar barra de favoritos'} aria-label="Barra de favoritos" aria-pressed={favBar}>
+          <span aria-hidden="true">★</span>
+        </button>
+        <button className={magnet ? 'active' : ''} onClick={() => onMagnet(!magnet)} title="Imán: pegar los puntos al máximo, mínimo, apertura o cierre de las velas (o mantené Ctrl mientras dibujás)" aria-label="Imán" aria-pressed={magnet}>
           <Icon name="magnet" />
         </button>
         <button className={hidden ? 'active' : ''} onClick={() => onHidden(!hidden)} title={hidden ? 'Mostrar dibujos' : 'Ocultar dibujos'} aria-label={hidden ? 'Mostrar dibujos' : 'Ocultar dibujos'} aria-pressed={hidden}>

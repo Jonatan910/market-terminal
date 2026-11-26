@@ -255,10 +255,32 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   display: flex; align-items: center; justify-content: flex-start; gap: 10px;
   width: 100%; height: 34px; padding: 0 8px; color: var(--text); white-space: nowrap;
 }
-.draw-toolbar .draw-menu button.active { background: var(--accent); }
+.draw-menu-row { display: flex; align-items: center; border-radius: 6px; }
+.draw-menu-row:hover { background: var(--bg); }
+.draw-menu-row.active { background: var(--accent); }
+.draw-toolbar .draw-menu .draw-menu-row button:first-child { flex: 1; }
+.draw-toolbar .draw-menu .star { width: 34px; justify-content: center; padding: 0; font-size: 16px; color: var(--muted); }
+.draw-toolbar .draw-menu .star.on { color: #f5c518; }
+.draw-toolbar .draw-menu .star:hover { color: #f5c518; }
+.draw-toolbar .fav-toggle { font-size: 16px; }
+.draw-toolbar .fav-toggle.active { background: transparent; color: #f5c518; }
+.draw-toolbar .fav-toggle.active:hover { background: var(--panel-2); }
+
+/* barra de favoritos (flotante, se arrastra) */
+.fav-bar {
+  position: absolute; left: 8px; bottom: 40px; z-index: 5;
+  display: flex; align-items: center; gap: 1px; max-width: calc(100% - 16px); overflow-x: auto;
+  padding: 3px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); box-shadow: 0 8px 24px #0008;
+}
+.fav-bar button { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 6px; color: var(--muted); }
+.fav-bar button:hover { color: var(--text); background: var(--bg); }
+.fav-bar button.active { color: #fff; background: var(--accent); }
+.fav-bar .fav-grip { width: 16px; cursor: grab; touch-action: none; }
+.fav-bar .fav-grip:active { cursor: grabbing; }
+.fav-empty { padding: 0 8px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 
 .draw-hint {
-  position: absolute; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 4;
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 4;
   padding: 4px 10px; border-radius: 6px; font-size: 12px; white-space: nowrap; pointer-events: none;
   background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
 }
