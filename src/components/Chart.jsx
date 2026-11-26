@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createChart, CandlestickSeries, HistogramSeries, CrosshairMode, TickMarkType } from 'lightweight-charts';
+import { createChart, CandlestickSeries, HistogramSeries, CrosshairMode, TickMarkType, LineStyle } from 'lightweight-charts';
 import { fetchCandles, fetchOlderCandles, pairLabel, parseId, sourceLabel, subscribeCandles } from '../api/market';
 import { KLINES_LIMIT } from '../api/binance';
 import { formatPrice, priceDecimals } from '../format';
@@ -58,7 +58,7 @@ function tickMark(time, type) {
   return F.time.format(d);
 }
 
-export default function Chart({ symbol, interval, indicators, drawings, onDrawingsChange }) {
+export default function Chart({ symbol, interval, indicators, drawings, onDrawingsChange, alerts = [], onCreateAlert, onLastPrice }) {
   const market = parseId(symbol).market;
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -71,6 +71,9 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
   const drawRef = useRef(null); // controlador de dibujos
   const onDrawingsChangeRef = useRef(onDrawingsChange);
   onDrawingsChangeRef.current = onDrawingsChange;
+  const cursorPriceRef = useRef(null); // precio bajo el cursor (para Alt+A)
+  const callbacksRef = useRef({});
+  callbacksRef.current = { onCreateAlert, onLastPrice };
   const [tool, setTool] = useState('cursor');
   const [magnet, setMagnet] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -156,6 +159,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     chart.subscribeCrosshairMove((param) => {
       const c = param.seriesData?.get(candlesRef.current);
       hoverRef.current = Boolean(c);
+      cursorPriceRef.current = param.point && (param.paneIndex ?? 0) === 0 ? candlesRef.current.coordinateToPrice(param.point.y) : null;
       setLegend(c ? { ...c } : null);
       setIndLegend(layerRef.current.legend(c ? param.seriesData : null));
     });
@@ -174,6 +178,32 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     layerRef.current.setInstances(indicators);
     setIndLegend(layerRef.current.legend(null));
   }, [indicators]);
+
+  // Alertas del símbolo: línea naranja punteada con 🔔 en el precio de cada una.
+  useEffect(() => {
+    const series = candlesRef.current;
+    const lines = alerts.map((a) =>
+      series.createPriceLine({ price: a.price, color: '#ff9800', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: '🔔' }),
+    );
+    return () => lines.forEach((l) => series.removePriceLine(l));
+  }, [alerts]);
+
+  // Alt+A: alerta en el precio donde está el cursor (o en el último precio).
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!e.altKey || e.code !== 'KeyA' || e.target.closest?.('input, textarea, select')) return;
+      const price = cursorPriceRef.current ?? barsRef.current.at(-1)?.close;
+      if (price != null) callbacksRef.current.onCreateAlert?.(price);
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Último precio -> App (para proponerlo al crear una alerta).
+  useEffect(() => {
+    if (last) callbacksRef.current.onLastPrice?.(last.close);
+  }, [last]);
 
   // Dibujos y opciones de dibujo -> controlador.
   // Ojo: con llaves, para que el efecto no devuelva nada (React toma lo que devuelve como "limpieza").
@@ -362,6 +392,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
               drawing={selected}
               onUpdate={(patch) => onDrawingsChange(drawings.map((d) => (d.id === selected.id ? { ...d, ...patch } : d)))}
               onDuplicate={() => drawRef.current.duplicate(selected.id)}
+              onAlert={['hline', 'hray', 'crossline'].includes(selected.type) ? () => onCreateAlert?.(selected.points[0].price) : null}
               onDelete={() => drawRef.current.remove(selected.id)}
             />
           )}

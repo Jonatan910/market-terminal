@@ -1,12 +1,17 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import Chart from './components/Chart';
 import Watchlist from './components/Watchlist';
 import SymbolSearch from './components/SymbolSearch';
 import IndicatorsPanel from './components/IndicatorsPanel';
 import UpdateBanner from './components/UpdateBanner';
+import AlertsPanel, { alertText } from './components/AlertsPanel';
+import Toasts from './components/Toasts';
+import { useAlertEngine } from './alerts/useAlertEngine';
+import { blinkTitle, playChime, systemNotification } from './alerts/notify';
+import { formatPrice, priceDecimals } from './format';
 import { defaultIndicators, INDICATORS } from './indicators/catalog';
 import { TIMEFRAMES } from './api/binance';
-import { parseId } from './api/market';
+import { pairLabel, parseId } from './api/market';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
 // Una lista por pestaña. Cada símbolo es "mercado:ticker".
@@ -46,6 +51,10 @@ export default function App() {
   const [tab, setTab] = useLocalStorage('mt.tab', 'crypto');
   const [savedIndicators, setIndicators] = useLocalStorage('mt.indicators', defaultIndicators);
   const [allDrawings, setAllDrawings] = useLocalStorage('mt.drawings', {}); // { 'crypto:BTCUSDT': [dibujos] }
+  const [alerts, setAlerts] = useLocalStorage('mt.alerts', []); // alertas de precio
+  const [alertLog, setAlertLog] = useLocalStorage('mt.alertLog', []); // historial de alertas disparadas
+  const [toasts, setToasts] = useState([]);
+  const chartPriceRef = useRef(null); // último precio del gráfico abierto
 
   const symbol = normalize(savedSymbol);
   const lists = useMemo(() => ({ ...DEFAULT_LISTS, ...savedLists }), [savedLists]);
@@ -81,6 +90,51 @@ export default function App() {
     [setLists],
   );
 
+  // ---------- alertas ----------
+  const toast = useCallback((t) => setToasts((list) => [...list.slice(-3), { id: `${Date.now()}${Math.random()}`, ...t }]), []);
+  const closeToast = useCallback((id) => setToasts((list) => list.filter((t) => t.id !== id)), []);
+
+  const goTo = useCallback(
+    (id) => {
+      setSymbol(id);
+      setTab(parseId(id).market);
+    },
+    [setSymbol, setTab],
+  );
+
+  // Se cumplió una alerta: avisar de todas las formas y anotarla en el historial.
+  const onTrigger = useCallback(
+    (a, price) => {
+      const text = alertText(a);
+      const at = Date.now();
+      setAlerts((list) => list.map((x) => (x.id === a.id ? { ...x, triggeredAt: at, ...(x.repeat === 'once' && { active: false }) } : x)));
+      setAlertLog((log) => [{ id: `${at}${a.id}`, at, symbol: a.symbol, text, price, message: a.message }, ...log].slice(0, 50));
+      const body = `Precio: ${formatPrice(price, parseId(a.symbol).market)}${a.message ? ` — ${a.message}` : ''}`;
+      toast({ title: text, body, symbol: a.symbol });
+      playChime();
+      systemNotification(`🔔 ${text}`, body, () => goTo(a.symbol));
+      blinkTitle(pairLabel(a.symbol));
+    },
+    [setAlerts, setAlertLog, toast, goTo],
+  );
+
+  const engineRef = useAlertEngine(alerts, onTrigger);
+  const getPrice = (id) => (id === symbol ? chartPriceRef.current : engineRef.current[id]) ?? null;
+
+  const createAlert = useCallback(
+    (a, { fromChart = false } = {}) => {
+      // El precio se redondea a los decimales del mercado (Alt+A da el precio exacto del cursor).
+      const price = Number(a.price.toFixed(priceDecimals(a.price, parseId(a.symbol).market)));
+      const alert = { id: `a${Date.now().toString(36)}`, active: true, createdAt: Date.now(), repeat: 'once', condition: 'crossing', message: '', ...a, price };
+      setAlerts((list) => [...list, alert]);
+      if (fromChart) toast({ title: 'Alerta creada', body: alertText(alert), kind: 'info' });
+    },
+    [setAlerts, toast],
+  );
+  const updateAlert = useCallback((id, patch) => setAlerts((list) => list.map((a) => (a.id === id ? { ...a, ...patch } : a))), [setAlerts]);
+  const removeAlert = useCallback((id) => setAlerts((list) => list.filter((a) => a.id !== id)), [setAlerts]);
+  const chartAlerts = useMemo(() => alerts.filter((a) => a.active && a.symbol === symbol), [alerts, symbol]);
+
   return (
     <div className="app">
       <UpdateBanner />
@@ -98,17 +152,40 @@ export default function App() {
           ))}
         </nav>
         <IndicatorsPanel value={indicators} onChange={setIndicators} />
+        <AlertsPanel
+          alerts={alerts}
+          log={alertLog}
+          symbols={Object.values(lists).flat()}
+          currentSymbol={symbol}
+          getPrice={getPrice}
+          onCreate={createAlert}
+          onUpdate={updateAlert}
+          onRemove={removeAlert}
+          onClearLog={() => setAlertLog([])}
+          onGoTo={goTo}
+        />
       </header>
 
       <main className="layout">
         <section className="main-chart">
-          <Chart symbol={symbol} interval={interval} indicators={indicators} drawings={drawings} onDrawingsChange={setDrawings} />
+          <Chart
+            symbol={symbol}
+            interval={interval}
+            indicators={indicators}
+            drawings={drawings}
+            onDrawingsChange={setDrawings}
+            alerts={chartAlerts}
+            onCreateAlert={(price) => createAlert({ symbol, price }, { fromChart: true })}
+            onLastPrice={(p) => (chartPriceRef.current = p)}
+          />
         </section>
         <aside className="side">
           <h2>Lista de seguimiento</h2>
           <Watchlist lists={lists} tab={tab} onTab={setTab} active={symbol} onSelect={setSymbol} onRemove={remove} />
         </aside>
       </main>
+
+      <Toasts items={toasts} onClose={closeToast} onGoTo={goTo} />
 
       <footer className="footer">
         Cripto: Binance, en vivo · Acciones y forex: Yahoo Finanzas, cada 15 s · No es asesoramiento financiero

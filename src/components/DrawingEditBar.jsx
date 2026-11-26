@@ -3,7 +3,7 @@ import { Icon } from './DrawingToolbar';
 
 // Barra flotante para editar el dibujo seleccionado:
 // color, grosor, tipo de línea, extender, texto, duplicar y borrar.
-export default function DrawingEditBar({ drawing, onUpdate, onDuplicate, onDelete }) {
+export default function DrawingEditBar({ drawing, onUpdate, onDuplicate, onDelete, onAlert }) {
   const def = TOOLS[drawing.type];
   const { style } = drawing;
   const setStyle = (patch) => onUpdate({ style: { ...style, ...patch } });
@@ -68,6 +68,11 @@ export default function DrawingEditBar({ drawing, onUpdate, onDuplicate, onDelet
         <input className="draw-text" value={drawing.text || ''} onChange={(e) => onUpdate({ text: e.target.value })} placeholder="Escribí el texto" aria-label="Texto" autoFocus />
       )}
 
+      {onAlert && (
+        <button className="draw-action" onClick={onAlert} title="Crear alerta en este precio" aria-label="Crear alerta en este precio">
+          <span aria-hidden="true">🔔</span>
+        </button>
+      )}
       <button className="draw-action" onClick={onDuplicate} title="Duplicar (Ctrl+C y Ctrl+V, o Alt + arrastrar)" aria-label="Duplicar dibujo">
         <Icon name="copy" size={16} />
       </button>

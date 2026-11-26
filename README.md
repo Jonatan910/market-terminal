@@ -35,6 +35,12 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 - **Imán**: pega los puntos al máximo, mínimo, apertura o cierre de la vela. Se activa con el botón
   o manteniendo **Ctrl** (Cmd en Mac) mientras dibujás; un circulito muestra dónde se pega.
 - Ocultar y borrar todos. Cada símbolo guarda sus dibujos y se ven en todas las temporalidades.
+- **Alertas de precio** para cripto, acciones y forex: cruza, cruza hacia arriba/abajo, mayor que, menor que;
+  una sola vez o cada vez que se cumpla, con mensaje opcional. Avisan con cartel, sonido, notificación del
+  sistema y el título de la pestaña. Se ven en el gráfico como línea naranja 🔔. Atajos: **Alt+A** (alerta en
+  el precio del cursor) y el botón 🔔 de la línea horizontal. Historial de las disparadas.
+  Funcionan mientras la página esté abierta (aunque sea en otra pestaña).
+- Aviso de versión nueva con botón para actualizar.
 - Fechas y horas en la zona horaria de tu compu.
 - Recuerda el símbolo, la temporalidad y la lista en el navegador.
 - Se adapta al celular.
@@ -99,6 +105,11 @@ src/
   components/DrawingToolbar.jsx barra de herramientas de dibujo
   components/DrawingEditBar.jsx barra para editar el dibujo seleccionado
   components/FavoritesBar.jsx barra flotante de herramientas favoritas
+  components/AlertsPanel.jsx panel de alertas: crear, pausar, borrar, historial
+  components/Toasts.jsx    carteles de aviso
+  alerts/conditions.js     cuándo se dispara cada tipo de alerta (con pruebas)
+  alerts/useAlertEngine.js vigila los precios de los símbolos con alertas
+  alerts/notify.js         sonido, notificación del sistema y título de la pestaña
   drawings/tools.js        cada herramienta: cómo se dibuja y cómo se selecciona
   drawings/controller.js   mouse/dedo: crear, seleccionar, mover y borrar dibujos
   drawings/timeMap.js      convierte fecha <-> posición de vela (con pruebas)
@@ -114,7 +125,7 @@ src/
 ## Próximos pasos
 
 - Más indicadores: VWAP, Estocástico, ATR, Ichimoku.
-- Alertas de precio.
+- Alertas que avisen con la página cerrada (servidor + Telegram).
 - Más herramientas de dibujo: abanico de Gann, zonas de tiempo de Fibonacci.
 
 Los datos son de Binance y Yahoo Finanzas y pueden tener demoras. No es asesoramiento financiero.
