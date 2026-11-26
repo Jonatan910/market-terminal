@@ -41,6 +41,7 @@ const TOOL_HINT = {
   long: 'Hacé clic en el precio de entrada',
   short: 'Hacé clic en el precio de entrada',
   channel: 'Marcá 2 puntos de la línea y un 3.º para el ancho del canal',
+  gann: 'Marcá 2 esquinas opuestas de la cuadrícula',
   path: 'Hacé clic en cada punto · doble clic o Enter para terminar',
   brush: 'Apretá y arrastrá para dibujar',
   xabcd: 'Marcá los 5 puntos: X, A, B, C y D',
@@ -80,6 +81,20 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
   const [favBar, setFavBar] = useLocalStorage('mt.favBar', () => window.innerWidth > 760);
   const [favPos, setFavPos] = useLocalStorage('mt.favPos', null);
   const toggleFavorite = (id) => setFavorites((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
+  // Herramientas nuevas: se suman una sola vez a los favoritos ya guardados (al lado de su vecina).
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('mt.favAdded.gann')) return;
+      localStorage.setItem('mt.favAdded.gann', '1');
+    } catch {
+      return;
+    }
+    setFavorites((f) => {
+      if (f.includes('gann')) return f;
+      const i = f.indexOf('rect');
+      return i >= 0 ? [...f.slice(0, i + 1), 'gann', ...f.slice(i + 1)] : [...f, 'gann'];
+    });
+  }, [setFavorites]);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [error, setError] = useState('');
   const [legend, setLegend] = useState(null); // vela bajo el cursor

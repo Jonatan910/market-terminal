@@ -21,9 +21,9 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
   precio con los decimales de cada mercado, variación y aviso de mercado cerrado.
 - Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI y MACD en paneles propios.
   Se pueden agregar varias veces (por ejemplo EMA 20 y EMA 50), cambiar sus valores y su color.
-- 23 herramientas de dibujo, agrupadas en menús:
+- 24 herramientas de dibujo, agrupadas en menús:
   - **Líneas:** tendencia, rayo, línea extendida, flecha, horizontal, rayo horizontal, vertical y cruz.
-  - **Canales y Fibonacci:** canal paralelo y retroceso de Fibonacci.
+  - **Canales, Fibonacci y Gann:** canal paralelo, retroceso de Fibonacci y cuadrícula de Gann.
   - **Formas:** rectángulo, elipse, camino y pincel.
   - **Patrones:** XABCD (con proporciones), ondas de Elliott 1-5 y ABC, triángulo ABCDE.
   - **Posiciones y medición:** posición larga y corta (objetivo, stop y R/R) y medir precio.

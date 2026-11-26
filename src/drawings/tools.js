@@ -122,6 +122,7 @@ const inBox = (a, b, x, y) =>
   x >= Math.min(a.x, b.x) - TOL && x <= Math.max(a.x, b.x) + TOL && y >= Math.min(a.y, b.y) - TOL && y <= Math.max(a.y, b.y) + TOL;
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+const GANN_LEVELS = [0, 0.25, 0.382, 0.5, 0.618, 0.75, 1];
 const UP = '#26a69a';
 const DOWN = '#ef5350';
 
@@ -387,6 +388,62 @@ export const TOOLS = {
     },
   },
 
+  // Cuadrícula de Gann: caja dividida en niveles de precio y de tiempo, con las diagonales y el
+  // abanico de líneas que salen de la esquina inicial hacia cada nivel de los lados opuestos.
+  gann: {
+    name: 'Cuadrícula de Gann',
+    points: 2,
+    draw(ctx, d, [a, b], env) {
+      if (!b) return;
+      const color = d.style.color;
+      const X = (lv) => a.x + (b.x - a.x) * lv;
+      const Y = (lv) => a.y + (b.y - a.y) * lv;
+      // Fondo con bandas alternadas
+      for (let i = 0; i < GANN_LEVELS.length - 1; i++) {
+        ctx.fillStyle = withAlpha(color, i % 2 ? 0.04 : 0.09);
+        ctx.fillRect(Math.min(a.x, b.x), Y(GANN_LEVELS[i]), Math.abs(b.x - a.x), Y(GANN_LEVELS[i + 1]) - Y(GANN_LEVELS[i]));
+      }
+      // Cuadrícula: bordes con el grosor elegido, líneas internas finas
+      ctx.save();
+      for (const lv of GANN_LEVELS) {
+        const edge = lv === 0 || lv === 1;
+        ctx.lineWidth = edge ? d.style.width : 1;
+        ctx.globalAlpha = edge ? 1 : 0.55;
+        line(ctx, { x: X(lv), y: a.y }, { x: X(lv), y: b.y });
+        line(ctx, { x: a.x, y: Y(lv) }, { x: b.x, y: Y(lv) });
+      }
+      ctx.restore();
+      // Abanico desde la esquina inicial + las dos diagonales
+      ctx.save();
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.8;
+      ctx.setLineDash([5, 4]);
+      for (const lv of GANN_LEVELS.slice(1)) {
+        line(ctx, a, { x: b.x, y: Y(lv) });
+        line(ctx, a, { x: X(lv), y: b.y });
+      }
+      ctx.setLineDash([]);
+      line(ctx, { x: a.x, y: b.y }, { x: b.x, y: a.y });
+      ctx.restore();
+      // Precio de cada nivel (a la izquierda) y nivel de tiempo (abajo)
+      const [p0, p1] = [d.points[0].price, d.points[1].price];
+      const left = Math.min(a.x, b.x);
+      const bottom = Math.max(a.y, b.y);
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.fillStyle = color;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (const lv of GANN_LEVELS) ctx.fillText(`${lv} (${env.formatPrice(p0 + (p1 - p0) * lv)})`, left - 4, Y(lv));
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      for (const lv of GANN_LEVELS) ctx.fillText(String(lv), X(lv), bottom + 4);
+      ctx.restore();
+    },
+    hit: (d, [a, b], x, y) => inBox(a, b, x, y),
+  },
+
   // --- formas ---
   rect: {
     name: 'Rectángulo',
@@ -562,7 +619,7 @@ function rectX(a, b, d, env) {
 // Grupos de la barra de herramientas (cada grupo es un botón con menú desplegable).
 export const TOOL_GROUPS = [
   { id: 'lines', label: 'Líneas', tools: ['trend', 'ray', 'extended', 'arrow', 'hline', 'hray', 'vline', 'crossline'] },
-  { id: 'fib', label: 'Canales y Fibonacci', tools: ['channel', 'fib'] },
+  { id: 'fib', label: 'Canales, Fibonacci y Gann', tools: ['channel', 'fib', 'gann'] },
   { id: 'shapes', label: 'Formas', tools: ['rect', 'ellipse', 'path', 'brush'] },
   { id: 'patterns', label: 'Patrones', tools: ['xabcd', 'elliott', 'elliottabc', 'triangle'] },
   { id: 'measure', label: 'Posiciones y medición', tools: ['long', 'short', 'range'] },
@@ -571,7 +628,7 @@ export const TOOL_GROUPS = [
 
 // Favoritas por defecto (las de la barra de favoritos al empezar).
 export const DEFAULT_FAVORITES = [
-  'hray', 'brush', 'crossline', 'ray', 'vline', 'trend', 'rect', 'hline', 'short', 'long',
+  'hray', 'brush', 'crossline', 'ray', 'vline', 'trend', 'rect', 'gann', 'hline', 'short', 'long',
   'range', 'path', 'arrow', 'fib', 'ellipse', 'elliott', 'triangle', 'xabcd', 'elliottabc', 'channel',
 ];
 
