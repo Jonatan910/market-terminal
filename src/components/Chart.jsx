@@ -29,7 +29,17 @@ const TOOL_HINT = {
   hline: 'Hacé clic en el precio donde va la línea',
   hray: 'Hacé clic donde empieza el rayo',
   vline: 'Hacé clic en la fecha donde va la línea',
+  crossline: 'Hacé clic donde va la cruz',
   text: 'Hacé clic donde va el texto',
+  long: 'Hacé clic en el precio de entrada',
+  short: 'Hacé clic en el precio de entrada',
+  channel: 'Marcá 2 puntos de la línea y un 3.º para el ancho del canal',
+  path: 'Hacé clic en cada punto · doble clic o Enter para terminar',
+  brush: 'Apretá y arrastrá para dibujar',
+  xabcd: 'Marcá los 5 puntos: X, A, B, C y D',
+  elliott: 'Marcá 6 puntos: el inicio y las ondas 1 a 5',
+  elliottabc: 'Marcá 4 puntos: el inicio y las ondas A, B y C',
+  triangle: 'Marcá 6 puntos: el inicio y A, B, C, D y E',
 };
 
 function tickMark(time, type) {
@@ -260,6 +270,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
             <DrawingEditBar
               drawing={selected}
               onUpdate={(patch) => onDrawingsChange(drawings.map((d) => (d.id === selected.id ? { ...d, ...patch } : d)))}
+              onDuplicate={() => drawRef.current.duplicate(selected.id)}
               onDelete={() => drawRef.current.remove(selected.id)}
             />
           )}

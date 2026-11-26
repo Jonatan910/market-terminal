@@ -1,14 +1,18 @@
 // Controlador de dibujos: escucha el mouse/dedo sobre el gráfico, crea, selecciona,
-// mueve y borra dibujos, y los pinta con una "primitiva" de lightweight-charts
+// mueve, copia y borra dibujos, y los pinta con una "primitiva" de lightweight-charts
 // (así se desplazan y hacen zoom junto con el gráfico).
 import { TOOLS, DEFAULT_STYLE, applyStroke } from './tools';
 import { createTimeMap } from './timeMap';
 import { formatPrice } from '../format';
 
 const HANDLE_R = 5; // radio de los puntitos para arrastrar las puntas
+const PASTE_SHIFT = 5; // al pegar, la copia se corre unas velas a la derecha para que se vea
 
 let idSeq = 0;
 const newId = () => `d${Date.now().toString(36)}${(idSeq++).toString(36)}`;
+
+// El "portapapeles" de dibujos: se comparte entre símbolos (copiás en BTC y pegás en ETH).
+let clipboard = null;
 
 export function createDrawingController({ chart, series, container, onChange, onSelect, onToolDone }) {
   let drawings = [];
@@ -20,14 +24,15 @@ export function createDrawingController({ chart, series, container, onChange, on
   let hidden = false;
   let selectedId = null;
   let draft = null; // dibujo que se está creando
+  let freehand = false; // pincel: dibujando mientras el botón está apretado
   let drag = null; // arrastre en curso
   let down = null; // dónde se apretó (para distinguir clic de arrastre)
+  let lastClick = { t: 0, x: 0, y: 0 }; // para detectar doble clic
   let requestUpdate = () => {};
 
   // ---------- conversión fecha/precio <-> píxeles ----------
   const ts = () => chart.timeScale();
   const priceToY = (p) => series.priceToCoordinate(p);
-  const timeToLogical = (t) => map.toLogical(t);
 
   // La librería solo convierte índices enteros a píxeles: entre dos velas, interpolamos.
   function logicalToX(logical) {
@@ -45,11 +50,11 @@ export function createDrawingController({ chart, series, container, onChange, on
     return x == null || y == null ? null : { x, y };
   }
 
-  function unproject(x, y) {
+  function unproject(x, y, useMagnet = magnet) {
     let logical = ts().coordinateToLogical(x);
     let price = series.coordinateToPrice(y);
     if (logical == null || price == null) return null;
-    if (magnet && bars.length) {
+    if (useMagnet && bars.length) {
       // Imán: se pega a la apertura, máximo, mínimo o cierre de la vela más cercana.
       const i = Math.max(0, Math.min(bars.length - 1, Math.round(logical)));
       const b = bars[i];
@@ -61,37 +66,44 @@ export function createDrawingController({ chart, series, container, onChange, on
     return { time: map.toTime(logical), price };
   }
 
+  // Corre todos los puntos de un dibujo dL velas y dP de precio.
+  const shiftPoints = (points, dL, dP) => points.map((p) => ({ time: map.toTime(map.toLogical(p.time) + dL), price: p.price + dP }));
+
   // ---------- pintar ----------
-  const env = () => {
-    const size = chart.paneSize(0);
-    return {
-      width: ts().width(),
-      height: size.height,
-      priceToY,
-      timeToLogical,
-      formatPrice: (n) => formatPrice(n, market),
-      measureText: (text, px) => {
-        measureCtx.font = `${px}px system-ui, sans-serif`;
-        return measureCtx.measureText(text).width;
-      },
-    };
-  };
   const measureCtx = document.createElement('canvas').getContext('2d');
+  const env = () => ({
+    width: ts().width(),
+    height: chart.paneSize(0).height,
+    priceToY,
+    yToPrice: (y) => series.coordinateToPrice(y),
+    logicalOf: (t) => map.toLogical(t),
+    timeAt: (l) => map.toTime(l),
+    formatPrice: (n) => formatPrice(n, market),
+    measureText: (text, px) => {
+      measureCtx.font = `${px}px system-ui, sans-serif`;
+      return measureCtx.measureText(text).width;
+    },
+  });
+
+  const handlesOf = (d) => (TOOLS[d.type].handles ? TOOLS[d.type].handles(d) : d.points);
 
   function render(ctx) {
     if (hidden) return;
     const e = env();
     const list = draft ? [...drawings, draft] : drawings;
     for (const d of list) {
+      const def = TOOLS[d.type];
+      if (!def) continue;
       const P = d.points.map(project);
       if (P.some((p) => !p)) continue;
       const selected = d.id === selectedId || d === draft;
       ctx.save();
       applyStroke(ctx, d.style, selected);
-      TOOLS[d.type].draw(ctx, d, P, e);
+      def.draw(ctx, d, P, e);
       ctx.restore();
-      if (selected) {
-        for (const p of P) {
+      if (selected && d !== draft) {
+        for (const p of handlesOf(d).map(project)) {
+          if (!p) continue;
           ctx.beginPath();
           ctx.arc(p.x, p.y, HANDLE_R, 0, Math.PI * 2);
           ctx.fillStyle = '#0b0e14';
@@ -126,15 +138,17 @@ export function createDrawingController({ chart, series, container, onChange, on
     const e = env();
     const sel = drawings.find((d) => d.id === selectedId);
     if (sel) {
-      const P = sel.points.map(project);
-      const i = P.findIndex((p) => p && Math.hypot(p.x - x, p.y - y) <= HANDLE_R + 3);
+      const H = handlesOf(sel).map(project);
+      const i = H.findIndex((p) => p && Math.hypot(p.x - x, p.y - y) <= HANDLE_R + 3);
       if (i >= 0) return { drawing: sel, handle: i };
     }
     for (let k = drawings.length - 1; k >= 0; k--) {
       const d = drawings[k];
+      const def = TOOLS[d.type];
+      if (!def) continue;
       const P = d.points.map(project);
       if (P.some((p) => !p)) continue;
-      if (TOOLS[d.type].hit(d, P, x, y, e)) return { drawing: d, handle: null };
+      if (def.hit(d, P, x, y, e)) return { drawing: d, handle: null };
     }
     return null;
   }
@@ -155,19 +169,34 @@ export function createDrawingController({ chart, series, container, onChange, on
     requestUpdate();
   }
 
-  function commit() {
-    onChange(drawings);
-  }
+  const commit = () => onChange(drawings);
 
   function finishDraft() {
     const d = draft;
     draft = null;
-    drawings = [...drawings, d];
+    freehand = false;
     lockChart(false);
+    if (!d) return;
+    // Un camino necesita al menos 2 puntos distintos; el pincel, al menos 2 puntos.
+    if (d.points.length < 2 && TOOLS[d.type].points !== 1 && !TOOLS[d.type].create) {
+      requestUpdate();
+      return;
+    }
+    drawings = [...drawings, d];
     commit();
     select(d.id);
     tool = 'cursor';
     onToolDone();
+  }
+
+  function newDrawing(type, points) {
+    return {
+      id: newId(),
+      type,
+      points,
+      style: { ...DEFAULT_STYLE },
+      ...(type === 'text' && { text: 'Texto' }),
+    };
   }
 
   function onPointerDown(ev) {
@@ -175,25 +204,40 @@ export function createDrawingController({ chart, series, container, onChange, on
     const pos = local(ev);
     if (!insidePane(pos)) return;
     down = { ...pos, moved: false };
+    const now = Date.now();
+    const isDouble = now - lastClick.t < 350 && Math.hypot(pos.x - lastClick.x, pos.y - lastClick.y) < 8;
+    lastClick = { t: now, ...pos };
 
     if (tool !== 'cursor') {
       const pt = unproject(pos.x, pos.y);
       if (!pt) return;
       lockChart(true);
       ev.preventDefault();
+      const def = TOOLS[tool];
+
       if (!draft) {
-        const def = TOOLS[tool];
-        draft = {
-          id: newId(),
-          type: tool,
-          points: def.points === 1 ? [pt] : [pt, { ...pt }],
-          style: { ...DEFAULT_STYLE, ...(tool === 'text' && { width: 2 }) },
-          ...(tool === 'text' && { text: 'Texto' }),
-        };
-        if (def.points === 1) finishDraft();
+        if (def.create) {
+          draft = newDrawing(tool, def.create(pt, env()));
+          finishDraft();
+        } else if (def.points === 1) {
+          draft = newDrawing(tool, [pt]);
+          finishDraft();
+        } else if (def.points === 'free') {
+          draft = newDrawing(tool, [unproject(pos.x, pos.y, false)]);
+          freehand = true;
+        } else {
+          draft = newDrawing(tool, [pt, { ...pt }]); // el segundo punto sigue al cursor
+        }
       } else {
-        draft.points[draft.points.length - 1] = pt; // segundo clic
-        finishDraft();
+        // Clic siguiente: fija el punto que seguía al cursor.
+        draft.points[draft.points.length - 1] = pt;
+        if (def.points === 'multi') {
+          if (isDouble) {
+            draft.points.pop(); // el doble clic agregó un punto repetido
+            finishDraft();
+          } else draft.points.push({ ...pt });
+        } else if (draft.points.length >= def.points) finishDraft();
+        else draft.points.push({ ...pt });
       }
       requestUpdate();
       return;
@@ -204,14 +248,20 @@ export function createDrawingController({ chart, series, container, onChange, on
       if (selectedId) select(null);
       return;
     }
-    select(hit.drawing.id);
+    let target = hit.drawing;
+    // Alt + arrastrar: duplica el dibujo y arrastra la copia (como en otras plataformas).
+    if (ev.altKey && hit.handle == null) {
+      target = { ...structuredClone(target), id: newId() };
+      drawings = [...drawings, target];
+    }
+    select(target.id);
     lockChart(true);
     drag = {
-      id: hit.drawing.id,
+      id: target.id,
       handle: hit.handle,
-      start: unproject(pos.x, pos.y),
+      start: unproject(pos.x, pos.y, false),
       startLogical: ts().coordinateToLogical(pos.x),
-      original: hit.drawing.points.map((p) => ({ ...p })),
+      original: structuredClone(target),
     };
   }
 
@@ -220,32 +270,37 @@ export function createDrawingController({ chart, series, container, onChange, on
     if (down && Math.hypot(pos.x - down.x, pos.y - down.y) > 4) down.moved = true;
 
     if (draft) {
-      const pt = unproject(pos.x, pos.y);
-      if (pt) {
-        draft.points[draft.points.length - 1] = pt;
-        requestUpdate();
+      if (freehand) {
+        const last = project(draft.points[draft.points.length - 1]);
+        if (!last || Math.hypot(last.x - pos.x, last.y - pos.y) > 3) {
+          const pt = unproject(pos.x, pos.y, false);
+          if (pt) draft.points.push(pt);
+        }
+      } else {
+        const pt = unproject(pos.x, pos.y);
+        if (pt) draft.points[draft.points.length - 1] = pt;
       }
+      requestUpdate();
       return;
     }
 
     if (drag) {
-      const d = drawings.find((x) => x.id === drag.id);
-      if (!d) return;
+      const def = TOOLS[drag.original.type];
       let points;
       if (drag.handle != null) {
         const pt = unproject(pos.x, pos.y);
         if (!pt) return;
-        points = drag.original.map((p, i) => (i === drag.handle ? pt : p));
+        points = def.moveHandle
+          ? def.moveHandle(drag.original, drag.handle, pt)
+          : drag.original.points.map((p, i) => (i === drag.handle ? pt : p));
       } else {
         // Mover todo el dibujo: mismo desplazamiento en velas y en precio para cada punto.
         const logical = ts().coordinateToLogical(pos.x);
         const price = series.coordinateToPrice(pos.y);
         if (logical == null || price == null) return;
-        const dL = logical - drag.startLogical;
-        const dP = price - drag.start.price;
-        points = drag.original.map((p) => ({ time: map.toTime(map.toLogical(p.time) + dL), price: p.price + dP }));
+        points = shiftPoints(drag.original.points, logical - drag.startLogical, price - drag.start.price);
       }
-      drawings = drawings.map((x) => (x.id === d.id ? { ...x, points } : x));
+      drawings = drawings.map((x) => (x.id === drag.id ? { ...x, points } : x));
       requestUpdate();
       return;
     }
@@ -253,15 +308,22 @@ export function createDrawingController({ chart, series, container, onChange, on
     // Cursor: manito sobre los dibujos.
     if (tool === 'cursor' && insidePane(pos)) {
       const hit = hitTest(pos.x, pos.y);
-      container.style.cursor = hit ? (hit.handle != null ? 'grab' : 'pointer') : '';
+      container.style.cursor = hit ? (hit.handle != null ? 'grab' : ev.altKey ? 'copy' : 'pointer') : '';
     } else {
       container.style.cursor = tool !== 'cursor' ? 'crosshair' : '';
     }
   }
 
   function onPointerUp() {
-    // Dibujo hecho arrastrando (apretar, mover y soltar) en vez de dos clics.
-    if (draft && down?.moved) finishDraft();
+    if (draft) {
+      const def = TOOLS[draft.type];
+      if (freehand) finishDraft();
+      // Dibujo hecho arrastrando (apretar, mover y soltar) en vez de clics:
+      else if (down?.moved && draft.points.length === 2) {
+        if (def.points === 2) finishDraft();
+        else draft.points.push({ ...draft.points[1] }); // herramientas de 3+ puntos: sigue con el próximo
+      }
+    }
     if (drag) {
       drag = null;
       lockChart(false);
@@ -270,21 +332,42 @@ export function createDrawingController({ chart, series, container, onChange, on
     down = null;
   }
 
+  function cancelDraft() {
+    draft = null;
+    freehand = false;
+    lockChart(false);
+    requestUpdate();
+  }
+
   function onKeyDown(ev) {
     if (ev.target.closest?.('input, textarea, select')) return; // escribiendo en un campo
+    const mod = ev.ctrlKey || ev.metaKey;
+
+    if (ev.key === 'Enter' && draft && TOOLS[draft.type].points === 'multi') {
+      draft.points.pop(); // el último punto es el que sigue al cursor
+      finishDraft();
+      return;
+    }
     if (ev.key === 'Escape') {
-      if (draft) {
-        draft = null;
-        lockChart(false);
-        requestUpdate();
-      }
+      if (draft) cancelDraft();
       if (tool !== 'cursor') {
         tool = 'cursor';
         onToolDone();
       } else if (selectedId) select(null);
+      return;
     }
     if ((ev.key === 'Delete' || ev.key === 'Backspace') && selectedId) {
       api.remove(selectedId);
+      ev.preventDefault();
+      return;
+    }
+    if (mod && ev.key.toLowerCase() === 'c' && selectedId && !window.getSelection()?.toString()) {
+      api.copy(selectedId);
+      ev.preventDefault();
+      return;
+    }
+    if (mod && ev.key.toLowerCase() === 'v' && clipboard) {
+      api.paste();
       ev.preventDefault();
     }
   }
@@ -293,6 +376,7 @@ export function createDrawingController({ chart, series, container, onChange, on
   container.addEventListener('pointerdown', onPointerDown, true);
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
   window.addEventListener('keydown', onKeyDown);
 
   const api = {
@@ -308,8 +392,7 @@ export function createDrawingController({ chart, series, container, onChange, on
     },
     setTool(t) {
       tool = t;
-      draft = null;
-      lockChart(false);
+      if (draft) cancelDraft();
       if (t !== 'cursor' && selectedId) select(null);
       container.style.cursor = t !== 'cursor' ? 'crosshair' : '';
       requestUpdate();
@@ -331,10 +414,30 @@ export function createDrawingController({ chart, series, container, onChange, on
       commit();
       requestUpdate();
     },
+    copy(id) {
+      const d = drawings.find((x) => x.id === id);
+      if (d) clipboard = structuredClone(d);
+    },
+    // Pega la copia corrida unas velas a la derecha, y la deja seleccionada.
+    paste() {
+      if (!clipboard || !bars.length) return;
+      const d = { ...structuredClone(clipboard), id: newId() };
+      d.points = shiftPoints(d.points, PASTE_SHIFT, 0);
+      clipboard = structuredClone(d); // pegar otra vez corre la siguiente copia un poco más
+      drawings = [...drawings, d];
+      commit();
+      select(d.id);
+    },
+    duplicate(id) {
+      api.copy(id);
+      api.paste();
+    },
+    hasClipboard: () => Boolean(clipboard),
     destroy() {
       container.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
       window.removeEventListener('keydown', onKeyDown);
     },
   };

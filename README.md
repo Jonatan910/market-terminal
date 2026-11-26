@@ -18,10 +18,17 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
   precio con los decimales de cada mercado, variación y aviso de mercado cerrado.
 - Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI y MACD en paneles propios.
   Se pueden agregar varias veces (por ejemplo EMA 20 y EMA 50), cambiar sus valores y su color.
-- Herramientas de dibujo: línea de tendencia, rayo, línea extendida, línea y rayo horizontal, línea vertical,
-  rectángulo, retroceso de Fibonacci, medición de precio y texto. Se pueden seleccionar, mover, cambiar de
-  color, grosor y tipo de línea, y borrar (tecla Supr). Imán para pegarse a los precios de las velas.
-  Cada símbolo guarda sus dibujos y se ven en todas las temporalidades.
+- 23 herramientas de dibujo, agrupadas en menús:
+  - **Líneas:** tendencia, rayo, línea extendida, flecha, horizontal, rayo horizontal, vertical y cruz.
+  - **Canales y Fibonacci:** canal paralelo y retroceso de Fibonacci.
+  - **Formas:** rectángulo, elipse, camino y pincel.
+  - **Patrones:** XABCD (con proporciones), ondas de Elliott 1-5 y ABC, triángulo ABCDE.
+  - **Posiciones y medición:** posición larga y corta (objetivo, stop y R/R) y medir precio.
+  - **Texto.**
+- Editar el dibujo seleccionado: color, grosor, tipo de línea, **extender a izquierda/derecha**
+  (un rectángulo con las dos cruza todo el gráfico), texto, **duplicar** y borrar.
+- **Copiar y pegar** con Ctrl+C / Ctrl+V (también entre símbolos) y **Alt + arrastrar** para duplicar.
+- Imán, ocultar y borrar todos. Cada símbolo guarda sus dibujos y se ven en todas las temporalidades.
 - Fechas y horas en la zona horaria de tu compu.
 - Recuerda el símbolo, la temporalidad y la lista en el navegador.
 - Se adapta al celular.
@@ -101,6 +108,6 @@ src/
 
 - Más indicadores: VWAP, Estocástico, ATR, Ichimoku.
 - Alertas de precio.
-- Más herramientas de dibujo: canal paralelo, posición larga/corta.
+- Más herramientas de dibujo: abanico de Gann, zonas de tiempo de Fibonacci.
 
 Los datos son de Binance y Yahoo Finanzas y pueden tener demoras. No es asesoramiento financiero.
