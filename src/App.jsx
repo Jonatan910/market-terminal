@@ -9,9 +9,9 @@ const DEFAULT_WATCHLIST = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'BNBUSDT'
 
 export default function App() {
   // Todo se recuerda en el navegador: al volver a entrar, está como lo dejaste.
-  const [symbol, setSymbol] = useLocalStorage('ct.symbol', 'BTCUSDT');
-  const [interval, setTimeframe] = useLocalStorage('ct.interval', '4h');
-  const [watchlist, setWatchlist] = useLocalStorage('ct.watchlist', DEFAULT_WATCHLIST);
+  const [symbol, setSymbol] = useLocalStorage('mt.symbol', 'BTCUSDT');
+  const [interval, setTimeframe] = useLocalStorage('mt.interval', '4h');
+  const [watchlist, setWatchlist] = useLocalStorage('mt.watchlist', DEFAULT_WATCHLIST);
 
   // Elegir en el buscador: abre el gráfico y lo suma a la lista si no estaba.
   const pick = useCallback(
@@ -29,7 +29,7 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <span className="logo" aria-hidden="true" />
-          Cripto Terminal
+          Market Terminal
         </div>
         <SymbolSearch onPick={pick} />
         <nav className="timeframes" aria-label="Temporalidad">

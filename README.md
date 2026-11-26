@@ -1,7 +1,10 @@
-# Cripto Terminal
+# Market Terminal
 
-Terminal de trading cripto hecha con **React**, **Vite** y **Lightweight Charts**.
-Muestra gráficos de velas en vivo con datos públicos de Binance (sin cuentas ni claves).
+Terminal de mercados hecha con **React**, **Vite** y **Lightweight Charts**.
+Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
+
+- **Cripto:** datos de Binance (disponible).
+- **Acciones de EE.UU. (Nasdaq):** en desarrollo.
 
 ## Qué hace
 
@@ -27,7 +30,7 @@ Abrí la dirección que aparece (normalmente http://localhost:5173).
 
 1. Subí el proyecto a un repositorio de GitHub (rama `main`).
 2. En el repositorio: **Settings → Pages → Source: GitHub Actions**.
-3. Cada vez que subas cambios, se publica solo en `https://TU-USUARIO.github.io/cripto-terminal/`.
+3. Cada vez que subas cambios, se publica solo en `https://TU-USUARIO.github.io/market-terminal/`.
 
 ## Estructura
 
@@ -45,6 +48,7 @@ src/
 
 ## Próximos pasos
 
+- Acciones del Nasdaq y NYSE.
 - Indicadores: medias móviles, RSI, MACD, Bandas de Bollinger.
 - Herramientas de dibujo y alertas de precio.
 
