@@ -3,6 +3,7 @@ import Chart from './components/Chart';
 import Watchlist from './components/Watchlist';
 import SymbolSearch from './components/SymbolSearch';
 import IndicatorsPanel from './components/IndicatorsPanel';
+import UpdateBanner from './components/UpdateBanner';
 import { defaultIndicators, INDICATORS } from './indicators/catalog';
 import { TIMEFRAMES } from './api/binance';
 import { parseId } from './api/market';
@@ -82,6 +83,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <UpdateBanner />
       <header className="topbar">
         <div className="brand">
           <span className="logo" aria-hidden="true" />
