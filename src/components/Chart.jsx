@@ -119,7 +119,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
         // Separador entre el panel del precio y los de indicadores (se puede arrastrar para cambiar alturas).
         panes: { separatorColor: '#2a3142', separatorHoverColor: '#4c8dff33', enableResize: true },
       },
-      grid: { vertLines: { color: '#1c2230' }, horzLines: { color: '#1c2230' } },
+      grid: { vertLines: { visible: false }, horzLines: { visible: false } }, // fondo limpio, sin cuadrícula
       crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: { borderColor: '#2a3142' },
       timeScale: { borderColor: '#2a3142', timeVisible: true, secondsVisible: false, tickMarkFormatter: tickMark },
