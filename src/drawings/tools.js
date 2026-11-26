@@ -3,7 +3,6 @@
 //   draw(ctx, d, P, env): dibuja en el canvas. P = puntos en píxeles [{x, y}]
 //   hit(d, P, x, y, env): ¿el punto (x, y) está sobre el dibujo?
 // `d` es el dibujo guardado: { id, type, points: [{ time, price }], style, text }
-import { formatPrice } from '../format';
 
 const TOL = 6; // tolerancia en píxeles para "tocar" una línea
 
@@ -108,7 +107,7 @@ export const TOOLS = {
     points: 1,
     draw(ctx, d, [a], env) {
       line(ctx, { x: 0, y: a.y }, { x: env.width, y: a.y });
-      label(ctx, formatPrice(d.points[0].price), env.width - 2, a.y, d.style.color, 'right');
+      label(ctx, env.formatPrice(d.points[0].price), env.width - 2, a.y, d.style.color, 'right');
     },
     hit: (d, [a], x, y) => Math.abs(y - a.y) < TOL,
   },
@@ -118,7 +117,7 @@ export const TOOLS = {
     points: 1,
     draw(ctx, d, [a], env) {
       line(ctx, a, { x: env.width, y: a.y });
-      label(ctx, formatPrice(d.points[0].price), env.width - 2, a.y, d.style.color, 'right');
+      label(ctx, env.formatPrice(d.points[0].price), env.width - 2, a.y, d.style.color, 'right');
     },
     hit: (d, [a], x, y) => x >= a.x - TOL && Math.abs(y - a.y) < TOL,
   },
@@ -172,7 +171,7 @@ export const TOOLS = {
         ctx.font = '11px system-ui, sans-serif';
         ctx.fillStyle = d.style.color;
         ctx.textBaseline = 'bottom';
-        ctx.fillText(`${L.lv} (${formatPrice(L.price)})`, left + 4, L.y - 2);
+        ctx.fillText(`${L.lv} (${env.formatPrice(L.price)})`, left + 4, L.y - 2);
         ctx.restore();
       }
       ctx.save();
@@ -212,7 +211,7 @@ export const TOOLS = {
       const diff = p1 - p0;
       const pct = (diff / p0) * 100;
       const bars = Math.round(Math.abs(env.timeToLogical(d.points[1].time) - env.timeToLogical(d.points[0].time)));
-      const text = `${diff >= 0 ? '+' : ''}${formatPrice(diff)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%) · ${bars} velas`;
+      const text = `${diff >= 0 ? '+' : ''}${env.formatPrice(diff)} (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%) · ${bars} velas`;
       label(ctx, text, mid, b.y + (up ? -14 : 14), color, 'center');
     },
     hit: (d, [a, b], x, y) =>

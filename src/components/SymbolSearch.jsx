@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchUsdtSymbols } from '../api/binance';
 import { searchStocks } from '../api/stocks';
+import { searchForex } from '../api/forex';
 
-// Buscador de cripto y acciones: escribís "sol" o "apple" y sugiere resultados de los dos mercados.
+// Buscador de cripto, acciones y forex: escribís "sol", "apple" o "eur" y sugiere de los tres mercados.
 export default function SymbolSearch({ onPick }) {
   const [cryptoList, setCryptoList] = useState([]);
   const [stockResults, setStockResults] = useState([]);
@@ -52,8 +53,17 @@ export default function SymbolSearch({ onPick }) {
       tag: s.type === 'ETF' ? 'ETF' : 'Acción',
       exact: s.symbol === q,
     }));
-    // Las coincidencias exactas van primero (escribir "AAPL" o "BTC" y Enter abre ese).
-    return [...crypto, ...stocks].sort((a, b) => b.exact - a.exact);
+    const forex = searchForex(query)
+      .slice(0, 4)
+      .map((p) => ({
+        id: `forex:${p.ticker}`,
+        title: `${p.ticker.slice(0, 3)}/${p.ticker.slice(3)}`,
+        subtitle: p.name,
+        tag: 'Forex',
+        exact: p.ticker === q,
+      }));
+    // Las coincidencias exactas van primero (escribir "AAPL", "BTC" o "EURUSD" y Enter abre ese).
+    return [...crypto, ...stocks, ...forex].sort((a, b) => b.exact - a.exact);
   }, [cryptoList, stockResults, query]);
 
   // Cerrar la lista al hacer clic afuera.
@@ -82,7 +92,7 @@ export default function SymbolSearch({ onPick }) {
     <div className="search" ref={boxRef}>
       <input
         type="search"
-        placeholder="Buscar: BTC, AAPL, NVDA, QQQ…"
+        placeholder="Buscar: BTC, AAPL, QQQ, EURUSD…"
         value={query}
         onFocus={() => {
           loadOnce();

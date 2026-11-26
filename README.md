@@ -7,13 +7,15 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 
 - **Cripto:** Binance, en vivo por WebSocket.
 - **Acciones y ETF de EE.UU. (Nasdaq, NYSE):** Yahoo Finanzas a través de un servidor propio, se actualizan cada 15 s.
+- **Forex:** pares mayores y latinoamericanos (EUR/USD, USD/JPY, USD/ARS…), también por Yahoo Finanzas.
 
 ## Qué hace
 
 - Gráfico de velas con volumen, actualizado en tiempo real por WebSocket.
-- Buscador de cripto y acciones (BTC, AAPL, NVDA, QQQ…), navegable con el teclado.
+- Buscador de cripto, acciones y forex (BTC, AAPL, QQQ, EURUSD, "peso"…), navegable con el teclado.
 - Temporalidades: 1m, 5m, 15m, 1h, 4h, 1D y 1S.
-- Lista de seguimiento mixta: par, fuente de datos (Binance, Nasdaq, NYSE…), precio, variación y aviso de mercado cerrado.
+- Lista de seguimiento con pestañas **Cripto / Acciones / Forex**: par, fuente de datos (Binance, Nasdaq, NYSE…),
+  precio con los decimales de cada mercado, variación y aviso de mercado cerrado.
 - Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI y MACD en paneles propios.
   Se pueden agregar varias veces (por ejemplo EMA 20 y EMA 50), cambiar sus valores y su color.
 - Herramientas de dibujo: línea de tendencia, rayo, línea extendida, línea y rayo horizontal, línea vertical,
@@ -75,7 +77,8 @@ api/
 src/
   api/binance.js           pedidos REST y WebSocket a Binance
   api/stocks.js            pedidos a nuestro servidor /api
-  api/market.js            capa común cripto / acciones
+  api/market.js            capa común cripto / acciones / forex
+  api/forex.js             lista de pares de divisas y su búsqueda
   components/Chart.jsx     gráfico de velas + volumen
   components/Watchlist.jsx lista de seguimiento en vivo
   components/SymbolSearch.jsx buscador de símbolos

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, CrosshairMode, TickMarkType } from 'lightweight-charts';
 import { fetchCandles, pairLabel, parseId, sourceLabel, subscribeCandles } from '../api/market';
-import { formatPrice } from '../format';
+import { formatPrice, priceDecimals } from '../format';
 import { createIndicatorLayer } from '../indicators/layer';
 import { createDrawingController } from '../drawings/controller';
 import DrawingToolbar from './DrawingToolbar';
@@ -23,6 +23,8 @@ const F = {
 };
 const toDate = (t) => new Date(t * 1000);
 
+const MARKET_LABEL = { crypto: 'Cripto', stock: 'Acción', forex: 'Forex' };
+
 const TOOL_HINT = {
   hline: 'Hacé clic en el precio donde va la línea',
   hray: 'Hacé clic donde empieza el rayo',
@@ -39,6 +41,7 @@ function tickMark(time, type) {
 }
 
 export default function Chart({ symbol, interval, indicators, drawings, onDrawingsChange }) {
+  const market = parseId(symbol).market;
   const containerRef = useRef(null);
   const chartRef = useRef(null);
   const candlesRef = useRef(null);
@@ -155,6 +158,16 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
         setMeta(info);
         if (!candles.length) throw new Error('Sin datos para esta temporalidad');
         barsRef.current = candles;
+        // Decimales del eje según el precio y el mercado (EUR/USD 1.09730, DOGE 0.05697…).
+        const precision = priceDecimals(candles.at(-1).close, market);
+        const priceFormat = { type: 'price', precision, minMove: 1 / 10 ** precision };
+        candlesRef.current.applyOptions({ priceFormat });
+        // El forex no tiene volumen: se oculta y el precio usa ese espacio.
+        const hasVolume = candles.some((c) => c.volume > 0);
+        volumeRef.current.applyOptions({ visible: hasVolume });
+        candlesRef.current.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: hasVolume ? 0.25 : 0.08 } });
+        layerRef.current.setPriceFormat(priceFormat);
+        drawRef.current.setMarket(market);
         candlesRef.current.setData(candles);
         volumeRef.current.setData(candles.map(volBar));
         layerRef.current.setBars(candles);
@@ -192,12 +205,12 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
       cancelled = true;
       unsubscribe();
     };
-  }, [symbol, interval]);
+  }, [symbol, interval, market]);
 
   const selected = drawings.find((d) => d.id === selectedId);
   const shown = legend || last;
   const change = shown ? ((shown.close - shown.open) / shown.open) * 100 : 0;
-  const isStock = parseId(symbol).market === 'stock';
+
 
   return (
     <div className="chart-wrap">
@@ -205,12 +218,12 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
         <strong>{pairLabel(symbol)}</strong>
         {meta.name && <span className="muted name">{meta.name}</span>}
         <span className="badge">
-          {isStock ? 'Acción' : 'Cripto'} · {sourceLabel(symbol, meta.exchange)}
+          {MARKET_LABEL[market]} · {sourceLabel(symbol, meta.exchange)}
         </span>
         <span className="muted">{interval}</span>
         {shown && (
           <span className={change >= 0 ? 'up' : 'down'}>
-            Ap {formatPrice(shown.open)} · Máx {formatPrice(shown.high)} · Mín {formatPrice(shown.low)} · Cie {formatPrice(shown.close)} (
+            Ap {formatPrice(shown.open, market)} · Máx {formatPrice(shown.high, market)} · Mín {formatPrice(shown.low, market)} · Cie {formatPrice(shown.close, market)} (
             {change >= 0 ? '+' : ''}
             {change.toFixed(2)}%)
           </span>
@@ -223,7 +236,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
               <span style={{ color: ind.color }}>{ind.label}</span>{' '}
               {ind.values.map((v) => (
                 <span key={v.label} style={{ color: v.color }}>
-                  {v.value == null ? '—' : formatPrice(v.value)}{' '}
+                  {v.value == null ? '—' : formatPrice(v.value, ind.overlay ? market : undefined)}{' '}
                 </span>
               ))}
             </span>

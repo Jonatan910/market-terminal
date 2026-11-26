@@ -11,6 +11,7 @@ export function createIndicatorLayer(chart) {
   let instances = [];
   let bars = [];
   let entries = []; // [{ inst, def, series: { key: api }, data: { key: number[] } }]
+  let priceFormat = null; // decimales del precio (para las líneas dibujadas sobre el precio)
 
   function clear() {
     for (const e of entries) for (const s of Object.values(e.series)) chart.removeSeries(s);
@@ -52,6 +53,7 @@ export function createIndicatorLayer(chart) {
       for (const level of def.levels || []) {
         firstLine.createPriceLine({ price: level, color: '#5d6678', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false });
       }
+      if (def.pane === 'overlay' && priceFormat) Object.values(series).forEach((s) => s.applyOptions({ priceFormat }));
       entries.push({ inst, def, series, data: {} });
     }
     // El panel del precio ocupa 3 partes; cada panel de indicador, 1.
@@ -82,6 +84,10 @@ export function createIndicatorLayer(chart) {
       instances = list;
       build();
     },
+    setPriceFormat(pf) {
+      priceFormat = pf;
+      for (const e of entries) if (e.def.pane === 'overlay') Object.values(e.series).forEach((s) => s.applyOptions({ priceFormat: pf }));
+    },
     setBars(list) {
       bars = list;
       fill();
@@ -91,6 +97,7 @@ export function createIndicatorLayer(chart) {
       return entries.map(({ inst, def, series, data }) => ({
         uid: inst.uid,
         label: instanceLabel(inst),
+        overlay: def.pane === 'overlay',
         color: inst.color,
         values: def.outputs
           .filter((o) => o.type === 'line')

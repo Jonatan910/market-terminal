@@ -50,6 +50,7 @@ export function cleanSymbol(s) {
 const EXCHANGES = {
   NMS: 'Nasdaq', NGM: 'Nasdaq', NCM: 'Nasdaq', NAS: 'Nasdaq',
   NYQ: 'NYSE', NYS: 'NYSE', PCX: 'NYSE Arca', ASE: 'NYSE American', BTS: 'Cboe',
+  CCY: 'Forex',
 };
 export const exchangeLabel = (code) => EXCHANGES[code] || code || '';
 
@@ -76,12 +77,14 @@ export async function candles(symbol, interval) {
     const r = data?.chart?.result?.[0];
     if (!r?.timestamp) throw new HttpError(404, `No hay datos para ${symbol}`);
     const q = r.indicators.quote[0];
+    const isCurrency = r.meta.instrumentType === 'CURRENCY';
     let bars = [];
     for (let i = 0; i < r.timestamp.length; i++) {
       if (q.open[i] == null || q.close[i] == null) continue; // Yahoo a veces deja huecos
-      // En intradiario, Yahoo agrega una vela "vacía" a las 16:00 (sin volumen y sin movimiento): se descarta.
+      // En intradiario, Yahoo agrega a las acciones una vela "vacía" a las 16:00 (sin volumen y sin
+      // movimiento): se descarta. En forex no hay volumen, así que ahí no se aplica.
       const intraday = cfg.yahoo !== '1d' && cfg.yahoo !== '1wk';
-      if (intraday && !q.volume[i] && q.high[i] === q.low[i]) continue;
+      if (intraday && !isCurrency && !q.volume[i] && q.high[i] === q.low[i]) continue;
       bars.push({ time: r.timestamp[i], open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] || 0 });
     }
     if (cfg.group) bars = groupBars(bars, cfg.group, r.meta.gmtoffset || 0);

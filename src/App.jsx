@@ -5,35 +5,49 @@ import SymbolSearch from './components/SymbolSearch';
 import IndicatorsPanel from './components/IndicatorsPanel';
 import { defaultIndicators, INDICATORS } from './indicators/catalog';
 import { TIMEFRAMES } from './api/binance';
+import { parseId } from './api/market';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
-// Cada símbolo es "mercado:ticker".
-const DEFAULT_WATCHLIST = [
-  'crypto:BTCUSDT',
-  'crypto:ETHUSDT',
-  'crypto:SOLUSDT',
-  'stock:QQQ',
-  'stock:AAPL',
-  'stock:NVDA',
-  'stock:MSFT',
-  'stock:TSLA',
-];
+// Una lista por pestaña. Cada símbolo es "mercado:ticker".
+const DEFAULT_LISTS = {
+  crypto: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'BNBUSDT', 'DOGEUSDT'].map((t) => `crypto:${t}`),
+  stock: ['QQQ', 'SPY', 'AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'META'].map((t) => `stock:${t}`),
+  forex: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'USDARS'].map((t) => `forex:${t}`),
+};
 
 const NO_DRAWINGS = [];
 
 // Listas guardadas con la versión anterior ("BTCUSDT") pasan a "crypto:BTCUSDT".
 const normalize = (id) => (id.includes(':') ? id : `crypto:${id}`);
 
+// La primera vez: si había una lista única de una versión anterior, se reparte en pestañas
+// (y forex arranca con la lista por defecto).
+function initialLists() {
+  try {
+    const old = JSON.parse(localStorage.getItem('mt.watchlist'));
+    if (Array.isArray(old)) {
+      const lists = { crypto: [], stock: [], forex: [] };
+      for (const id of old.map(normalize)) lists[parseId(id).market]?.push(id);
+      if (!lists.forex.length) lists.forex = DEFAULT_LISTS.forex;
+      return lists;
+    }
+  } catch {
+    /* sin almacenamiento o dato roto: se usan las listas por defecto */
+  }
+  return DEFAULT_LISTS;
+}
+
 export default function App() {
   // Todo se recuerda en el navegador: al volver a entrar, está como lo dejaste.
   const [savedSymbol, setSymbol] = useLocalStorage('mt.symbol', 'crypto:BTCUSDT');
   const [interval, setTimeframe] = useLocalStorage('mt.interval', '4h');
-  const [savedList, setWatchlist] = useLocalStorage('mt.watchlist', DEFAULT_WATCHLIST);
+  const [savedLists, setLists] = useLocalStorage('mt.watchlists', initialLists);
+  const [tab, setTab] = useLocalStorage('mt.tab', 'crypto');
   const [savedIndicators, setIndicators] = useLocalStorage('mt.indicators', defaultIndicators);
   const [allDrawings, setAllDrawings] = useLocalStorage('mt.drawings', {}); // { 'crypto:BTCUSDT': [dibujos] }
 
   const symbol = normalize(savedSymbol);
-  const watchlist = useMemo(() => savedList.map(normalize), [savedList]);
+  const lists = useMemo(() => ({ ...DEFAULT_LISTS, ...savedLists }), [savedLists]);
   // Descarta indicadores guardados que ya no existan en el catálogo.
   const indicators = useMemo(() => savedIndicators.filter((i) => INDICATORS[i.type]), [savedIndicators]);
 
@@ -44,19 +58,27 @@ export default function App() {
     [symbol, setAllDrawings],
   );
 
-  // Elegir en el buscador: abre el gráfico y lo suma a la lista si no estaba.
+  // Elegir en el buscador: abre el gráfico, lo suma a la lista de su mercado y muestra esa pestaña.
   const pick = useCallback(
     (id) => {
+      const { market } = parseId(id);
       setSymbol(id);
-      setWatchlist((w) => {
-        const list = w.map(normalize);
-        return list.includes(id) ? list : [...list, id];
+      setTab(market);
+      setLists((all) => {
+        const list = all[market] || [];
+        return list.includes(id) ? all : { ...all, [market]: [...list, id] };
       });
     },
-    [setSymbol, setWatchlist],
+    [setSymbol, setTab, setLists],
   );
 
-  const remove = useCallback((id) => setWatchlist((w) => w.map(normalize).filter((x) => x !== id)), [setWatchlist]);
+  const remove = useCallback(
+    (id) => {
+      const { market } = parseId(id);
+      setLists((all) => ({ ...all, [market]: (all[market] || []).filter((x) => x !== id) }));
+    },
+    [setLists],
+  );
 
   return (
     <div className="app">
@@ -82,12 +104,12 @@ export default function App() {
         </section>
         <aside className="side">
           <h2>Lista de seguimiento</h2>
-          <Watchlist symbols={watchlist} active={symbol} onSelect={setSymbol} onRemove={remove} />
+          <Watchlist lists={lists} tab={tab} onTab={setTab} active={symbol} onSelect={setSymbol} onRemove={remove} />
         </aside>
       </main>
 
       <footer className="footer">
-        Cripto: Binance, en vivo · Acciones: Yahoo Finanzas, cada 15 s · No es asesoramiento financiero
+        Cripto: Binance, en vivo · Acciones y forex: Yahoo Finanzas, cada 15 s · No es asesoramiento financiero
       </footer>
     </div>
   );

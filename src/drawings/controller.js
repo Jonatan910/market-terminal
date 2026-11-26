@@ -3,6 +3,7 @@
 // (así se desplazan y hacen zoom junto con el gráfico).
 import { TOOLS, DEFAULT_STYLE, applyStroke } from './tools';
 import { createTimeMap } from './timeMap';
+import { formatPrice } from '../format';
 
 const HANDLE_R = 5; // radio de los puntitos para arrastrar las puntas
 
@@ -15,6 +16,7 @@ export function createDrawingController({ chart, series, container, onChange, on
   let map = createTimeMap([]);
   let tool = 'cursor';
   let magnet = false;
+  let market = 'crypto'; // para mostrar los precios con los decimales correctos
   let hidden = false;
   let selectedId = null;
   let draft = null; // dibujo que se está creando
@@ -67,6 +69,7 @@ export function createDrawingController({ chart, series, container, onChange, on
       height: size.height,
       priceToY,
       timeToLogical,
+      formatPrice: (n) => formatPrice(n, market),
       measureText: (text, px) => {
         measureCtx.font = `${px}px system-ui, sans-serif`;
         return measureCtx.measureText(text).width;
@@ -312,6 +315,10 @@ export function createDrawingController({ chart, series, container, onChange, on
       requestUpdate();
     },
     setMagnet: (on) => (magnet = on),
+    setMarket(m) {
+      market = m;
+      requestUpdate();
+    },
     setHidden(on) {
       hidden = on;
       if (on) select(null);
