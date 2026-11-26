@@ -1,5 +1,5 @@
 // Acciones de EE.UU. a través de nuestro servidor (/api), que a su vez le pide a Yahoo Finanzas.
-// VITE_API_URL permite que la versión en GitHub Pages use el servidor publicado en Vercel.
+// VITE_API_URL (opcional) permite usar un servidor /api publicado en otro dominio.
 const API = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '') || './api';
 
 async function getJson(path) {

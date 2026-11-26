@@ -44,18 +44,12 @@ Navegador (React)
 | `/api/quotes?symbols=AAPL,MSFT` | Precio, variación del día y si el mercado está abierto |
 | `/api/search?q=apple` | Acciones y ETF de EE.UU. que coinciden |
 
-## Publicarlo en Vercel (recomendado: página + servidor)
+## Publicarlo en Vercel (página + servidor)
 
 1. Entrá a https://vercel.com con tu cuenta de GitHub.
 2. **Add New → Project**, elegí `market-terminal` y tocá **Deploy** (detecta Vite solo).
 3. Queda en `https://market-terminal-XXXX.vercel.app`. Cada cambio en `main` se publica solo.
 
-## Publicarlo en GitHub Pages (solo la página)
-
-1. Subí el proyecto a un repositorio de GitHub (rama `main`).
-2. En el repositorio: **Settings → Pages → Source: GitHub Actions**.
-3. Para que las acciones funcionen, en **Settings → Secrets and variables → Actions → Variables** creá `API_URL` con la dirección de Vercel terminada en `/api`.
-4. Cada vez que subas cambios, se publica solo en `https://TU-USUARIO.github.io/market-terminal/`.
 
 ## Estructura
 
@@ -74,7 +68,6 @@ src/
   hooks/useLocalStorage.js estado que se guarda en el navegador
   format.js                formato de precios y porcentajes
   App.jsx                  arma la pantalla
-.github/workflows/deploy.yml publicación automática en GitHub Pages
 ```
 
 ## Próximos pasos

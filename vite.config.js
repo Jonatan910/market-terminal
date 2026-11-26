@@ -22,8 +22,7 @@ function localApi() {
   };
 }
 
-// base: './' hace que la app funcione en cualquier carpeta,
-// por ejemplo en GitHub Pages (https://usuario.github.io/market-terminal/).
+// base: './' hace que la app funcione aunque se publique dentro de una subcarpeta.
 export default defineConfig({
   plugins: [react(), localApi()],
   base: './',
