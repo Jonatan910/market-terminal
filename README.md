@@ -14,6 +14,8 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 - Buscador de cripto y acciones (BTC, AAPL, NVDA, QQQ…), navegable con el teclado.
 - Temporalidades: 1m, 5m, 15m, 1h, 4h, 1D y 1S.
 - Lista de seguimiento mixta: precio y variación (24 h en cripto, del día en acciones) y aviso de mercado cerrado.
+- Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI y MACD en paneles propios.
+  Se pueden agregar varias veces (por ejemplo EMA 20 y EMA 50), cambiar sus valores y su color.
 - Fechas y horas en la zona horaria de tu compu.
 - Recuerda el símbolo, la temporalidad y la lista en el navegador.
 - Se adapta al celular.
@@ -28,6 +30,14 @@ npm run dev
 ```
 
 Abrí la dirección que aparece (normalmente http://localhost:5173). El servidor de acciones (`/api`) también corre ahí, no hace falta nada más.
+
+## Pruebas
+
+```bash
+npm test
+```
+
+Verifica los cálculos de los indicadores contra valores conocidos.
 
 ## Arquitectura
 
@@ -65,6 +75,11 @@ src/
   components/Chart.jsx     gráfico de velas + volumen
   components/Watchlist.jsx lista de seguimiento en vivo
   components/SymbolSearch.jsx buscador de símbolos
+  components/IndicatorsPanel.jsx panel para agregar y configurar indicadores
+  indicators/calc.js       cálculos (SMA, EMA, Bollinger, RSI, MACD)
+  indicators/calc.test.js  pruebas de los cálculos (npm test)
+  indicators/catalog.js    lista de indicadores: parámetros y cómo se dibujan
+  indicators/layer.js      dibuja los indicadores sobre el gráfico
   hooks/useLocalStorage.js estado que se guarda en el navegador
   format.js                formato de precios y porcentajes
   App.jsx                  arma la pantalla
@@ -72,7 +87,7 @@ src/
 
 ## Próximos pasos
 
-- Indicadores: medias móviles, RSI, MACD, Bandas de Bollinger.
+- Más indicadores: VWAP, Estocástico, ATR, Ichimoku.
 - Herramientas de dibujo y alertas de precio.
 
 Los datos son de Binance y Yahoo Finanzas y pueden tener demoras. No es asesoramiento financiero.

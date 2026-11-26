@@ -137,3 +137,58 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .r-sub { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .watchlist .sym { display: flex; align-items: center; gap: 6px; }
 .watchlist .closed { font-size: 10px; font-weight: 400; color: var(--muted); }
+
+/* ---------- indicadores ---------- */
+.ind-legend {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  padding: 0 16px 6px; font-size: 12px;
+}
+.ind-panel { position: relative; margin-left: auto; }
+.ind-toggle {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); white-space: nowrap;
+}
+.ind-toggle:hover, .ind-toggle.active { background: var(--panel-2); }
+.ind-toggle .count {
+  min-width: 18px; padding: 0 5px; border-radius: 9px;
+  font-size: 11px; line-height: 18px; text-align: center; background: var(--accent);
+}
+.ind-dropdown {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20;
+  width: min(360px, calc(100vw - 32px)); max-height: 75vh; overflow-y: auto;
+  padding: 12px; border-radius: 8px;
+  background: var(--panel-2); border: 1px solid var(--border); box-shadow: 0 12px 32px #000a;
+}
+.ind-dropdown h3 {
+  margin: 4px 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--muted);
+}
+.ind-dropdown .empty { margin: 0 0 4px; font-size: 13px; }
+.ind-add { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; }
+.ind-add button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 7px 9px; border-radius: 6px; border: 1px solid var(--border); text-align: left;
+}
+.ind-add button:hover { border-color: var(--accent); }
+.ind-add .muted { font-size: 11px; }
+.ind-active { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ind-active li { padding: 8px 10px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); }
+.ind-head { display: flex; align-items: center; gap: 8px; }
+.ind-head strong { flex: 1; }
+.ind-head .remove { font-size: 18px; color: var(--muted); padding: 0 4px; }
+.ind-head .remove:hover { color: var(--down); }
+.swatch { position: relative; width: 16px; height: 16px; border-radius: 4px; cursor: pointer; flex: none; }
+.swatch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; border: 0; padding: 0; }
+.ind-params { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; }
+.ind-params label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.ind-params input {
+  width: 64px; padding: 4px 6px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--text); font: inherit;
+}
+.ind-params input:focus { outline: none; border-color: var(--accent); }
+
+@media (max-width: 760px) {
+  .ind-panel { margin-left: 0; }
+  .ind-dropdown { position: fixed; left: 16px; right: 16px; top: 110px; width: auto; }
+  .layout { grid-template-rows: 70vh auto; }
+}

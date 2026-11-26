@@ -2,6 +2,8 @@ import { useCallback, useMemo } from 'react';
 import Chart from './components/Chart';
 import Watchlist from './components/Watchlist';
 import SymbolSearch from './components/SymbolSearch';
+import IndicatorsPanel from './components/IndicatorsPanel';
+import { defaultIndicators, INDICATORS } from './indicators/catalog';
 import { TIMEFRAMES } from './api/binance';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
@@ -25,9 +27,12 @@ export default function App() {
   const [savedSymbol, setSymbol] = useLocalStorage('mt.symbol', 'crypto:BTCUSDT');
   const [interval, setTimeframe] = useLocalStorage('mt.interval', '4h');
   const [savedList, setWatchlist] = useLocalStorage('mt.watchlist', DEFAULT_WATCHLIST);
+  const [savedIndicators, setIndicators] = useLocalStorage('mt.indicators', defaultIndicators);
 
   const symbol = normalize(savedSymbol);
   const watchlist = useMemo(() => savedList.map(normalize), [savedList]);
+  // Descarta indicadores guardados que ya no existan en el catálogo.
+  const indicators = useMemo(() => savedIndicators.filter((i) => INDICATORS[i.type]), [savedIndicators]);
 
   // Elegir en el buscador: abre el gráfico y lo suma a la lista si no estaba.
   const pick = useCallback(
@@ -58,11 +63,12 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <IndicatorsPanel value={indicators} onChange={setIndicators} />
       </header>
 
       <main className="layout">
         <section className="main-chart">
-          <Chart symbol={symbol} interval={interval} />
+          <Chart symbol={symbol} interval={interval} indicators={indicators} />
         </section>
         <aside className="side">
           <h2>Lista de seguimiento</h2>

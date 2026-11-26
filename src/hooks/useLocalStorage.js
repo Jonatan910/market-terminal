@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 // try/catch porque en modo incógnito o con el almacenamiento bloqueado puede fallar.
 export function useLocalStorage(key, initial) {
   const [value, setValue] = useState(() => {
+    // `initial` puede ser un valor o una función que lo crea (se llama una sola vez).
+    const fallback = () => (typeof initial === 'function' ? initial() : initial);
     try {
       const saved = localStorage.getItem(key);
-      return saved !== null ? JSON.parse(saved) : initial;
+      return saved !== null ? JSON.parse(saved) : fallback();
     } catch {
-      return initial;
+      return fallback();
     }
   });
 
