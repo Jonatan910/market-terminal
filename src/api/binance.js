@@ -25,8 +25,12 @@ async function getJson(path) {
 }
 
 // Velas (OHLCV). Binance devuelve arrays: [openTime, open, high, low, close, volume, ...]
-export async function fetchKlines(symbol, interval, limit = 500) {
-  const rows = await getJson(`/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+// Máximo 1000 por pedido. Con `before` (segundos) trae las velas anteriores a esa fecha:
+// así se va cargando más historia a medida que desplazás el gráfico hacia la izquierda.
+export const KLINES_LIMIT = 1000;
+export async function fetchKlines(symbol, interval, { limit = KLINES_LIMIT, before } = {}) {
+  const end = before ? `&endTime=${before * 1000 - 1}` : '';
+  const rows = await getJson(`/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}${end}`);
   return rows.map(toCandle);
 }
 

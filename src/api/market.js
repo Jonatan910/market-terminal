@@ -62,6 +62,14 @@ export async function fetchCandles(id, interval) {
   return { bars: d.bars, exchange: d.exchange, name: longName(id) || d.name };
 }
 
+// Velas anteriores a `before` (para ir cargando historia hacia atrás).
+// Solo cripto: en acciones y forex ya se pide de entrada todo lo que Yahoo permite.
+export async function fetchOlderCandles(id, interval, before) {
+  const { market, ticker } = parseId(id);
+  if (market !== 'crypto') return [];
+  return fetchKlines(ticker, interval, { before });
+}
+
 // Escucha la vela actual en vivo. Llama a onCandle(vela) en cada actualización.
 // Devuelve una función para dejar de escuchar.
 export function subscribeCandles(id, interval, onCandle) {

@@ -61,6 +61,9 @@ export function createIndicatorLayer(chart) {
     fill();
   }
 
+  const point = (out, time, v) =>
+    v == null ? { time } : out.type === 'histogram' ? { time, value: v, color: v >= 0 ? UP : DOWN } : { time, value: v };
+
   // Calcula todos los indicadores con las velas actuales y los dibuja.
   function fill() {
     if (!bars.length) return;
@@ -68,13 +71,25 @@ export function createIndicatorLayer(chart) {
       e.data = e.def.compute(bars, e.inst.params);
       for (const out of e.def.outputs) {
         const values = e.data[out.key];
-        e.series[out.key].setData(
-          bars.map((b, i) => {
-            const v = values[i];
-            if (v == null) return { time: b.time }; // "hueco": todavía no hay valor
-            return out.type === 'histogram' ? { time: b.time, value: v, color: v >= 0 ? UP : DOWN } : { time: b.time, value: v };
-          }),
-        );
+        e.series[out.key].setData(bars.map((b, i) => point(out, b.time, values[i]))); // null = "hueco"
+      }
+    }
+  }
+
+  // En vivo: recalcula, pero solo redibuja la última vela (y la anterior si recién empezó una nueva).
+  // Redibujar miles de puntos por segundo sería muy pesado.
+  function updateLast(newBars) {
+    const appended = newBars.length === bars.length + 1;
+    bars = newBars;
+    if (!bars.length) return;
+    const n = bars.length;
+    for (const e of entries) {
+      e.data = e.def.compute(bars, e.inst.params);
+      for (const out of e.def.outputs) {
+        const values = e.data[out.key];
+        const s = e.series[out.key];
+        if (appended && n > 1) s.update(point(out, bars[n - 2].time, values[n - 2]));
+        s.update(point(out, bars[n - 1].time, values[n - 1]));
       }
     }
   }
@@ -92,6 +107,7 @@ export function createIndicatorLayer(chart) {
       bars = list;
       fill();
     },
+    updateLast,
     // Valores para la leyenda: los de la vela bajo el cursor (seriesData) o los últimos.
     legend(seriesData) {
       return entries.map(({ inst, def, series, data }) => ({

@@ -12,6 +12,9 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 ## Qué hace
 
 - Gráfico de velas con volumen, actualizado en tiempo real por WebSocket.
+- **Toda la historia disponible:** en cripto se carga más a medida que desplazás el gráfico hacia la
+  izquierda (BTC desde 2017); en acciones y forex se pide todo lo que permite Yahoo
+  (diario y semanal completo, por ejemplo AAPL desde 1980; 1h: 2 años; 5m/15m: 60 días; 1m: 7 días).
 - Buscador de cripto, acciones y forex (BTC, AAPL, QQQ, EURUSD, "peso"…), navegable con el teclado.
 - Temporalidades: 1m, 5m, 15m, 1h, 4h, 1D y 1S.
 - Lista de seguimiento con pestañas **Cripto / Acciones / Forex**: par, fuente de datos (Binance, Nasdaq, NYSE…),

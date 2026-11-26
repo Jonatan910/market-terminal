@@ -55,25 +55,26 @@ const EXCHANGES = {
 export const exchangeLabel = (code) => EXCHANGES[code] || code || '';
 
 // ---------- velas ----------
-// Temporalidad de la app -> qué pedirle a Yahoo. Yahoo limita cuánta historia da por intervalo
-// (1m: 7 días, 5m/15m: 60 días, 60m: 730 días). 4h no existe en Yahoo: se arma juntando velas de 1h.
+// Temporalidad de la app -> qué pedirle a Yahoo. Pedimos todo lo que Yahoo permite:
+//   1m: 7 días · 5m/15m: 60 días · 60m: 730 días · diario/semanal: toda la historia.
+// Diario y semanal van con fechas exactas (period1=0): con range=max Yahoo devuelve velas mensuales.
+// 4h no existe en Yahoo: se arma juntando velas de 1h.
 const INTERVALS = {
-  '1m': { yahoo: '1m', range: '5d', ttl: 10_000 },
-  '5m': { yahoo: '5m', range: '1mo', ttl: 15_000 },
-  '15m': { yahoo: '15m', range: '1mo', ttl: 15_000 },
-  '1h': { yahoo: '60m', range: '6mo', ttl: 30_000 },
-  '4h': { yahoo: '60m', range: '2y', ttl: 60_000, group: 4 },
-  '1d': { yahoo: '1d', range: '5y', ttl: 60_000 },
-  '1w': { yahoo: '1wk', range: '10y', ttl: 300_000 },
+  '1m': { yahoo: '1m', range: '7d', ttl: 10_000 },
+  '5m': { yahoo: '5m', range: '60d', ttl: 15_000 },
+  '15m': { yahoo: '15m', range: '60d', ttl: 15_000 },
+  '1h': { yahoo: '60m', range: '730d', ttl: 30_000 },
+  '4h': { yahoo: '60m', range: '730d', ttl: 60_000, group: 4 },
+  '1d': { yahoo: '1d', all: true, ttl: 60_000 },
+  '1w': { yahoo: '1wk', all: true, ttl: 300_000 },
 };
 
 export async function candles(symbol, interval) {
   const cfg = INTERVALS[interval];
   if (!cfg) throw new HttpError(400, 'Temporalidad inválida');
   return cached(`c:${symbol}:${interval}`, cfg.ttl, async () => {
-    const data = await getJson(
-      `/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${cfg.yahoo}&range=${cfg.range}&includePrePost=false`,
-    );
+    const span = cfg.all ? `period1=0&period2=${Math.floor(Date.now() / 1000)}` : `range=${cfg.range}`;
+    const data = await getJson(`/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${cfg.yahoo}&${span}&includePrePost=false`);
     const r = data?.chart?.result?.[0];
     if (!r?.timestamp) throw new HttpError(404, `No hay datos para ${symbol}`);
     const q = r.indicators.quote[0];

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, CrosshairMode, TickMarkType } from 'lightweight-charts';
-import { fetchCandles, pairLabel, parseId, sourceLabel, subscribeCandles } from '../api/market';
+import { fetchCandles, fetchOlderCandles, pairLabel, parseId, sourceLabel, subscribeCandles } from '../api/market';
+import { KLINES_LIMIT } from '../api/binance';
 import { formatPrice, priceDecimals } from '../format';
 import { createIndicatorLayer } from '../indicators/layer';
 import { createDrawingController } from '../drawings/controller';
@@ -25,6 +26,9 @@ const F = {
   date: fmt({ weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' }),
 };
 const toDate = (t) => new Date(t * 1000);
+
+const VISIBLE_BARS = 150; // velas que se ven al abrir un gráfico (el resto, desplazando a la izquierda)
+const LOAD_MORE_AT = 50; // si quedan menos de 50 velas a la izquierda, se carga más historia
 
 const MARKET_LABEL = { crypto: 'Cripto', stock: 'Acción', forex: 'Forex' };
 
@@ -82,6 +86,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
   const [last, setLast] = useState(null); // última vela (en vivo)
   const [indLegend, setIndLegend] = useState([]); // valores de los indicadores
   const [meta, setMeta] = useState({}); // { exchange, name } de la acción
+  const [loadingOlder, setLoadingOlder] = useState(false); // cargando historia más vieja
   intervalRef.current = interval;
 
   // 1) Crear el gráfico una sola vez.
@@ -174,12 +179,50 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
   useEffect(() => {
     let cancelled = false;
     let unsubscribe = () => {};
+    let unsubscribeRange = () => {};
     setStatus('loading');
     setLegend(null);
 
     const volBar = (c) => ({ time: c.time, value: c.volume, color: c.close >= c.open ? UP + '66' : DOWN + '66' });
 
+    // Dibuja todas las velas de barsRef (al cargar y al sumar historia vieja).
+    function setAll() {
+      const bars = barsRef.current;
+      candlesRef.current.setData(bars);
+      volumeRef.current.setData(bars.map(volBar));
+      layerRef.current.setBars(bars);
+      drawRef.current.setBars(bars);
+    }
+
+    // Historia hacia atrás: al acercarse al borde izquierdo, pide las velas anteriores
+    // y las agrega adelante sin que el gráfico "salte".
+    let loading = false;
+    let noMore = market !== 'crypto'; // acciones y forex ya vienen con todo lo disponible
+    async function loadOlder(range) {
+      if (!range || loading || noMore || cancelled || range.from > LOAD_MORE_AT) return;
+      loading = true;
+      setLoadingOlder(true);
+      try {
+        const first = barsRef.current[0];
+        const older = (await fetchOlderCandles(symbol, interval, first.time)).filter((b) => b.time < first.time);
+        if (cancelled) return;
+        if (older.length < KLINES_LIMIT) noMore = true; // llegamos al inicio del par
+        if (!older.length) return;
+        const ts = chartRef.current.timeScale();
+        const visible = ts.getVisibleLogicalRange();
+        barsRef.current = [...older, ...barsRef.current];
+        setAll();
+        if (visible) ts.setVisibleLogicalRange({ from: visible.from + older.length, to: visible.to + older.length });
+      } catch {
+        /* se reintenta al volver a desplazar */
+      } finally {
+        loading = false;
+        if (!cancelled) setLoadingOlder(false);
+      }
+    }
+
     setMeta({});
+    setLoadingOlder(false);
     fetchCandles(symbol, interval)
       .then(({ bars: candles, ...info }) => {
         if (cancelled) return;
@@ -196,12 +239,14 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
         candlesRef.current.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: hasVolume ? 0.25 : 0.08 } });
         layerRef.current.setPriceFormat(priceFormat);
         drawRef.current.setMarket(market);
-        candlesRef.current.setData(candles);
-        volumeRef.current.setData(candles.map(volBar));
-        layerRef.current.setBars(candles);
-        drawRef.current.setBars(candles);
+        setAll();
         setIndLegend(layerRef.current.legend(null));
-        chartRef.current.timeScale().fitContent();
+        // Se muestran las últimas velas (como en otras plataformas); el resto, desplazando.
+        const n = candles.length;
+        chartRef.current.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - VISIBLE_BARS), to: n + 5 });
+        const ts = chartRef.current.timeScale();
+        ts.subscribeVisibleLogicalRangeChange(loadOlder);
+        unsubscribeRange = () => ts.unsubscribeVisibleLogicalRangeChange(loadOlder);
         setLast(candles.at(-1));
         setStatus('ready');
 
@@ -217,7 +262,10 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
           const bars = barsRef.current;
           const i = bars.findLastIndex((b) => b.time === c.time);
           barsRef.current = i >= 0 ? [...bars.slice(0, i), c, ...bars.slice(i + 1)] : [...bars, c];
-          layerRef.current.setBars(barsRef.current);
+          // Si cambió la última vela (o empezó una nueva) alcanza con actualizar el final;
+          // si cambió una anterior (pasa con acciones), se recalcula todo.
+          if (i < 0 || i === bars.length - 1) layerRef.current.updateLast(barsRef.current);
+          else layerRef.current.setBars(barsRef.current);
           if (bars.length !== barsRef.current.length) drawRef.current.setBars(barsRef.current); // vela nueva
           if (!hoverRef.current) setIndLegend(layerRef.current.legend(null));
           setLast(c);
@@ -232,6 +280,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribeRange();
     };
   }, [symbol, interval, market]);
 
@@ -298,6 +347,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
             />
           )}
           {tool !== 'cursor' && <div className="draw-hint">{TOOL_HINT[tool] || 'Hacé clic en el gráfico'} · Esc para cancelar</div>}
+          {loadingOlder && <div className="loading-older">Cargando historia…</div>}
           {status === 'loading' && <div className="overlay">Cargando {pairLabel(symbol)}…</div>}
           {status === 'error' && (
             <div className="overlay error">

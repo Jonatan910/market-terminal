@@ -308,3 +308,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .wl-tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
 .wl-tabs .count { font-size: 11px; padding: 0 5px; border-radius: 8px; background: var(--panel-2); }
 .wl-tabs button.active .count { background: var(--accent); color: #fff; }
+
+.loading-older {
+  position: absolute; left: 12px; top: 50%; z-index: 4; pointer-events: none;
+  padding: 4px 10px; border-radius: 6px; font-size: 12px;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+}
