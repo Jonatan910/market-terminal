@@ -13,6 +13,13 @@ function localApi() {
     const file = match && path.resolve('api', `${match[1]}.js`);
     if (!file || !fs.existsSync(file)) return next();
     const mod = await import(`${pathToFileURL(file).href}?t=${fs.statSync(file).mtimeMs}`);
+    // Funciones "Edge" (reciben un Request y devuelven un Response): se adaptan acá.
+    if (mod.config?.runtime === 'edge') {
+      const response = await mod.default(new Request(`http://localhost${req.url}`));
+      res.statusCode = response.status;
+      response.headers.forEach((v, k) => res.setHeader(k, v));
+      return res.end(Buffer.from(await response.arrayBuffer()));
+    }
     return mod.default(req, res);
   };
   return {

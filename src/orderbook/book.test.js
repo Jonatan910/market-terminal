@@ -40,3 +40,20 @@ test('un primer cambio que empieza después de la foto es un salto', () => {
   ob.loadSnapshot(snap);
   assert.equal(ob.apply({ U: 105, u: 110, b: [], a: [] }), 'gap');
 });
+
+test('futuros: el primer cambio debe cubrir la foto y después se encadena con pu', () => {
+  const ob = new OrderBook('futures');
+  ob.loadSnapshot(snap); // lastUpdateId 100
+  assert.equal(ob.apply({ U: 80, u: 99, pu: 79, b: [], a: [] }), 'skipped'); // viejo
+  assert.equal(ob.apply({ U: 98, u: 103, pu: 97, b: [['99', '7']], a: [] }), 'applied');
+  assert.equal(ob.bids.get(99), 7);
+  assert.equal(ob.apply({ U: 104, u: 110, pu: 103, b: [], a: [['101', '0']] }), 'applied');
+  assert.equal(ob.asks.has(101), false);
+  assert.equal(ob.apply({ U: 115, u: 120, pu: 112, b: [], a: [] }), 'gap'); // se perdió el 111-112
+});
+
+test('futuros: un primer cambio posterior a la foto es un salto', () => {
+  const ob = new OrderBook('futures');
+  ob.loadSnapshot(snap);
+  assert.equal(ob.apply({ U: 102, u: 105, pu: 101, b: [], a: [] }), 'gap');
+});

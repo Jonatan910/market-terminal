@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Chart from './components/Chart';
 import Watchlist from './components/Watchlist';
 import SymbolSearch from './components/SymbolSearch';
@@ -11,12 +11,12 @@ import { blinkTitle, playChime, systemNotification } from './alerts/notify';
 import { formatPrice, priceDecimals } from './format';
 import { defaultIndicators, INDICATORS } from './indicators/catalog';
 import { TIMEFRAMES } from './api/binance';
-import { pairLabel, parseId } from './api/market';
+import { pairLabel, parseId, tabOf } from './api/market';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
 // Una lista por pestaña. Cada símbolo es "mercado:ticker".
 const DEFAULT_LISTS = {
-  crypto: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'BNBUSDT', 'DOGEUSDT'].map((t) => `crypto:${t}`),
+  crypto: ['crypto:BTCUSDT', 'perp:BTCUSDT', 'crypto:ETHUSDT', 'crypto:SOLUSDT', 'crypto:XRPUSDT', 'crypto:BNBUSDT', 'crypto:DOGEUSDT'],
   stock: ['QQQ', 'SPY', 'AAPL', 'NVDA', 'MSFT', 'TSLA', 'AMZN', 'META'].map((t) => `stock:${t}`),
   forex: ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'USDARS'].map((t) => `forex:${t}`),
 };
@@ -33,7 +33,7 @@ function initialLists() {
     const old = JSON.parse(localStorage.getItem('mt.watchlist'));
     if (Array.isArray(old)) {
       const lists = { crypto: [], stock: [], forex: [] };
-      for (const id of old.map(normalize)) lists[parseId(id).market]?.push(id);
+      for (const id of old.map(normalize)) lists[tabOf(id)]?.push(id);
       if (!lists.forex.length) lists.forex = DEFAULT_LISTS.forex;
       return lists;
     }
@@ -58,6 +58,22 @@ export default function App() {
 
   const symbol = normalize(savedSymbol);
   const lists = useMemo(() => ({ ...DEFAULT_LISTS, ...savedLists }), [savedLists]);
+
+  // Una sola vez: suma el perpetuo de BTC a la lista de cripto ya guardada, al lado de BTC.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('mt.added.perpBTC')) return;
+      localStorage.setItem('mt.added.perpBTC', '1');
+    } catch {
+      return;
+    }
+    setLists((all) => {
+      const list = all.crypto || DEFAULT_LISTS.crypto;
+      if (list.includes('perp:BTCUSDT')) return all;
+      const i = list.indexOf('crypto:BTCUSDT');
+      return { ...all, crypto: i >= 0 ? [...list.slice(0, i + 1), 'perp:BTCUSDT', ...list.slice(i + 1)] : ['perp:BTCUSDT', ...list] };
+    });
+  }, [setLists]);
   // Descarta indicadores guardados que ya no existan en el catálogo.
   const indicators = useMemo(() => savedIndicators.filter((i) => INDICATORS[i.type]), [savedIndicators]);
 
@@ -71,12 +87,12 @@ export default function App() {
   // Elegir en el buscador: abre el gráfico, lo suma a la lista de su mercado y muestra esa pestaña.
   const pick = useCallback(
     (id) => {
-      const { market } = parseId(id);
+      const tab = tabOf(id);
       setSymbol(id);
-      setTab(market);
+      setTab(tab);
       setLists((all) => {
-        const list = all[market] || [];
-        return list.includes(id) ? all : { ...all, [market]: [...list, id] };
+        const list = all[tab] || [];
+        return list.includes(id) ? all : { ...all, [tab]: [...list, id] };
       });
     },
     [setSymbol, setTab, setLists],
@@ -84,8 +100,8 @@ export default function App() {
 
   const remove = useCallback(
     (id) => {
-      const { market } = parseId(id);
-      setLists((all) => ({ ...all, [market]: (all[market] || []).filter((x) => x !== id) }));
+      const tab = tabOf(id);
+      setLists((all) => ({ ...all, [tab]: (all[tab] || []).filter((x) => x !== id) }));
     },
     [setLists],
   );
@@ -97,7 +113,7 @@ export default function App() {
   const goTo = useCallback(
     (id) => {
       setSymbol(id);
-      setTab(parseId(id).market);
+      setTab(tabOf(id));
     },
     [setSymbol, setTab],
   );

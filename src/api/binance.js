@@ -1,25 +1,49 @@
 // Datos públicos de mercado de Binance. No necesitan cuenta ni clave.
-// data-api.binance.vision es el espejo oficial "solo datos de mercado" de Binance:
-// funciona desde el navegador (permite CORS) y en más países que api.binance.com.
+// Dos "mercados" (venues):
+//   spot    -> data-api.binance.vision: espejo oficial "solo datos de mercado" (funciona en más países)
+//   futures -> fapi.binance.com: futuros perpetuos USDT (BTCUSDT.P). Binance los bloquea en algunos
+//              países (por ejemplo EE.UU.); si el navegador no llega, se usa nuestro servidor /api/fapi.
 
-const REST_HOSTS = ['https://data-api.binance.vision', 'https://api.binance.com'];
-const WS_HOST = 'wss://data-stream.binance.vision/stream';
+export const VENUES = {
+  spot: {
+    rest: ['https://data-api.binance.vision', 'https://api.binance.com'],
+    ws: 'wss://data-stream.binance.vision/stream',
+    klines: '/api/v3/klines',
+    depth: '/api/v3/depth',
+    depthLimit: 5000,
+  },
+  futures: {
+    rest: ['https://fapi.binance.com'],
+    proxy: './api/fapi', // plan B: mismo pedido, a través de Vercel
+    ws: 'wss://fstream.binance.com/stream',
+    klines: '/fapi/v1/klines',
+    depth: '/fapi/v1/depth',
+    depthLimit: 1000, // futuros: máximo 1000 precios por lado
+  },
+};
 
-async function getJson(path) {
+async function getJson(path, venue = 'spot') {
+  const v = VENUES[venue];
   let lastError;
-  for (const host of REST_HOSTS) {
+  for (const host of v.rest) {
     let res;
     try {
       res = await fetch(host + path);
     } catch (e) {
-      lastError = e; // sin conexión o host bloqueado: probamos el siguiente
+      lastError = e; // sin conexión, host bloqueado o sin permiso CORS: probamos el siguiente
       continue;
     }
     if (res.ok) return res.json();
     const body = await res.json().catch(() => ({}));
     lastError = new Error(body.msg || `HTTP ${res.status}`);
     // 400 = pedido inválido (por ejemplo, un símbolo que no existe): otro host diría lo mismo.
-    if (res.status === 400) break;
+    if (res.status === 400) throw lastError;
+  }
+  if (v.proxy) {
+    const res = await fetch(`${v.proxy}?path=${encodeURIComponent(path)}`);
+    const body = await res.json().catch(() => ({}));
+    if (res.ok) return body;
+    throw new Error(body.msg || body.error || `HTTP ${res.status}`);
   }
   throw lastError;
 }
@@ -28,9 +52,9 @@ async function getJson(path) {
 // Máximo 1000 por pedido. Con `before` (segundos) trae las velas anteriores a esa fecha:
 // así se va cargando más historia a medida que desplazás el gráfico hacia la izquierda.
 export const KLINES_LIMIT = 1000;
-export async function fetchKlines(symbol, interval, { limit = KLINES_LIMIT, before } = {}) {
+export async function fetchKlines(symbol, interval, { limit = KLINES_LIMIT, before, venue = 'spot' } = {}) {
   const end = before ? `&endTime=${before * 1000 - 1}` : '';
-  const rows = await getJson(`/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}${end}`);
+  const rows = await getJson(`${VENUES[venue].klines}?symbol=${symbol}&interval=${interval}&limit=${limit}${end}`, venue);
   return rows.map(toCandle);
 }
 
@@ -49,33 +73,44 @@ export function toCandle(k) {
   };
 }
 
-// Libro de órdenes: foto completa (hasta 5000 precios de cada lado).
-export const fetchDepth = (symbol, limit = 5000) => getJson(`/api/v3/depth?symbol=${symbol}&limit=${limit}`);
+// Libro de órdenes: foto completa (spot hasta 5000 precios por lado, futuros hasta 1000).
+export const fetchDepth = (symbol, venue = 'spot') =>
+  getJson(`${VENUES[venue].depth}?symbol=${symbol}&limit=${VENUES[venue].depthLimit}`, venue);
 
-// Precio y variación de 24 h de varios símbolos en una sola llamada.
-export async function fetch24h(symbols) {
+// Precio y variación de 24 h de varios símbolos.
+export async function fetch24h(symbols, venue = 'spot') {
   if (!symbols.length) return [];
+  if (venue === 'futures') {
+    // Futuros no acepta una lista: se piden todos y se filtran.
+    const all = await getJson('/fapi/v1/ticker/24hr', venue);
+    const wanted = new Set(symbols);
+    return all.filter((r) => wanted.has(r.symbol));
+  }
   const list = encodeURIComponent(JSON.stringify(symbols));
   return getJson(`/api/v3/ticker/24hr?symbols=${list}&type=MINI`);
 }
 
-// Lista de pares que cotizan contra USDT (para el buscador).
-export async function fetchUsdtSymbols() {
+// Lista de pares contra USDT (para el buscador). En futuros, solo los perpetuos.
+export async function fetchUsdtSymbols(venue = 'spot') {
+  if (venue === 'futures') {
+    const data = await getJson('/fapi/v1/exchangeInfo', venue);
+    return data.symbols
+      .filter((s) => s.contractType === 'PERPETUAL' && s.quoteAsset === 'USDT' && s.status === 'TRADING')
+      .map((s) => ({ symbol: s.symbol, base: s.baseAsset }));
+  }
   const data = await getJson('/api/v3/exchangeInfo?permissions=SPOT&symbolStatus=TRADING');
-  return data.symbols
-    .filter((s) => s.quoteAsset === 'USDT')
-    .map((s) => ({ symbol: s.symbol, base: s.baseAsset }));
+  return data.symbols.filter((s) => s.quoteAsset === 'USDT').map((s) => ({ symbol: s.symbol, base: s.baseAsset }));
 }
 
 // Abre un WebSocket combinado (varios "streams" en una conexión) y se reconecta solo.
 // Devuelve una función para cerrarlo.
-export function openStream(streams, onMessage) {
+export function openStream(streams, onMessage, venue = 'spot') {
   let ws;
   let closed = false;
   let retry = 0;
 
   function connect() {
-    ws = new WebSocket(`${WS_HOST}?streams=${streams.join('/')}`);
+    ws = new WebSocket(`${VENUES[venue].ws}?streams=${streams.join('/')}`);
     ws.onopen = () => (retry = 0);
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);

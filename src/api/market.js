@@ -1,6 +1,7 @@
 // Capa común: el resto de la app no necesita saber de qué mercado es un símbolo.
 // Cada símbolo se guarda como "mercado:ticker":
-//   "crypto:BTCUSDT"  -> Binance
+//   "crypto:BTCUSDT"  -> Binance (spot)
+//   "perp:BTCUSDT"    -> Binance Futuros, perpetuo USDT (se muestra como BTCUSDT.P)
 //   "stock:AAPL"      -> Yahoo Finanzas (acciones y ETF de EE.UU.)
 //   "forex:EURUSD"    -> Yahoo Finanzas (ticker "EURUSD=X")
 import { fetchKlines, openStream, toCandle } from './binance';
@@ -19,16 +20,26 @@ export function parseId(id) {
   return { market, ticker };
 }
 
+// ¿Es de Binance (spot o perpetuo)? Tienen libro de órdenes, CVD, historia hacia atrás, etc.
+export const isBinance = (id) => ['crypto', 'perp'].includes(parseId(id).market);
+// En qué "venue" de Binance está: spot o futuros.
+export const venueOf = (id) => (parseId(id).market === 'perp' ? 'futures' : 'spot');
+// En qué pestaña de la lista va: los perpetuos van junto con las cripto.
+export const tabOf = (id) => (parseId(id).market === 'perp' ? 'crypto' : parseId(id).market);
+
 export function displayName(id) {
   const { market, ticker } = parseId(id);
   if (market === 'crypto') return ticker.replace(/USDT$/, '');
+  if (market === 'perp') return `${ticker}.P`;
   if (market === 'forex') return `${ticker.slice(0, 3)}/${ticker.slice(3)}`;
   return ticker;
 }
 
 export function pairLabel(id) {
   const { market, ticker } = parseId(id);
-  return market === 'crypto' ? `${ticker.replace(/USDT$/, '')}/USDT` : displayName(id);
+  if (market === 'crypto') return `${ticker.replace(/USDT$/, '')}/USDT`;
+  if (market === 'perp') return `${ticker}.P`; // como en TradingView: BTCUSDT.P
+  return displayName(id);
 }
 
 // Nombre largo, cuando lo conocemos sin preguntarle al servidor.
@@ -41,6 +52,7 @@ export function longName(id) {
 export function sourceLabel(id, exchange) {
   const { market } = parseId(id);
   if (market === 'crypto') return 'Binance';
+  if (market === 'perp') return 'Binance Futuros';
   if (market === 'forex') return 'Yahoo Finanzas';
   return exchange || 'EE.UU.';
 }
@@ -57,26 +69,27 @@ export const fromYahoo = (sym) => (sym.endsWith('=X') ? `forex:${sym.slice(0, -2
 // Devuelve { bars, exchange?, name? }
 export async function fetchCandles(id, interval) {
   const { market, ticker } = parseId(id);
-  if (market === 'crypto') return { bars: await fetchKlines(ticker, interval) };
+  if (isBinance(id)) return { bars: await fetchKlines(ticker, interval, { venue: venueOf(id) }) };
   const d = await fetchStockCandles(yahooTicker(id), interval);
   return { bars: d.bars, exchange: d.exchange, name: longName(id) || d.name };
 }
 
 // Velas anteriores a `before` (para ir cargando historia hacia atrás).
-// Solo cripto: en acciones y forex ya se pide de entrada todo lo que Yahoo permite.
+// Solo Binance: en acciones y forex ya se pide de entrada todo lo que Yahoo permite.
 export async function fetchOlderCandles(id, interval, before) {
-  const { market, ticker } = parseId(id);
-  if (market !== 'crypto') return [];
-  return fetchKlines(ticker, interval, { before });
+  if (!isBinance(id)) return [];
+  return fetchKlines(parseId(id).ticker, interval, { before, venue: venueOf(id) });
 }
 
 // Escucha la vela actual en vivo. Llama a onCandle(vela) en cada actualización.
 // Devuelve una función para dejar de escuchar.
 export function subscribeCandles(id, interval, onCandle) {
-  const { market, ticker } = parseId(id);
-  if (market === 'crypto') {
-    return openStream([`${ticker.toLowerCase()}@kline_${interval}`], ({ k }) =>
-      onCandle(toCandle([k.t, k.o, k.h, k.l, k.c, k.v, k.T, k.q, k.n, k.V])), // k.V = compras de takers
+  const { ticker } = parseId(id);
+  if (isBinance(id)) {
+    return openStream(
+      [`${ticker.toLowerCase()}@kline_${interval}`],
+      ({ k }) => onCandle(toCandle([k.t, k.o, k.h, k.l, k.c, k.v, k.T, k.q, k.n, k.V])), // k.V = compras de takers
+      venueOf(id),
     );
   }
   // Acciones y forex: cada 15 s pedimos las velas otra vez y pasamos las 2 últimas

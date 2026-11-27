@@ -8,6 +8,9 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 - **Cripto:** Binance, en vivo por WebSocket.
 - **Acciones y ETF de EE.UU. (Nasdaq, NYSE):** Yahoo Finanzas a través de un servidor propio, se actualizan cada 15 s.
 - **Forex:** pares mayores y latinoamericanos (EUR/USD, USD/JPY, USD/ARS…), también por Yahoo Finanzas.
+- **Perpetuos de Binance Futuros** (BTCUSDT.P, ETHUSDT.P…): velas, libro de órdenes, mapa de calor y CVD.
+  El navegador los pide directo; si no puede (permisos o bloqueo por país), usa el servidor `/api/fapi`
+  (Edge Function de Vercel, corre en la región más cercana al usuario).
 
 ## Qué hace
 
@@ -35,7 +38,7 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
   - **Patrones:** XABCD (con proporciones), ondas de Elliott 1-5 y ABC, triángulo ABCDE.
   - **Posiciones y medición:** posición larga y corta (objetivo, stop y R/R) y medir precio.
   - **Texto.**
-- Editar el dibujo seleccionado: color, grosor, tipo de línea, **extender a izquierda/derecha**
+- Editar el dibujo seleccionado: color, grosor, tipo de línea, **opacidad de línea y de relleno**, **extender a izquierda/derecha**
   (un rectángulo con las dos cruza todo el gráfico), texto, **duplicar** y borrar.
 - **Copiar y pegar** con Ctrl+C / Ctrl+V (también entre símbolos) y **Alt + arrastrar** para duplicar.
 - **Barra de favoritos** flotante y movible: se arma con la ☆ de cada herramienta en los menús.
@@ -85,6 +88,7 @@ Navegador (React)
 | `/api/candles?symbol=AAPL&interval=1h` | Velas (1m, 5m, 15m, 1h, 4h, 1d, 1w) |
 | `/api/quotes?symbols=AAPL,MSFT` | Precio, variación del día y si el mercado está abierto |
 | `/api/search?q=apple` | Acciones y ETF de EE.UU. que coinciden |
+| `/api/fapi?path=/fapi/v1/klines?...` | Plan B para Binance Futuros (solo rutas de datos públicos) |
 
 ## Publicarlo en Vercel (página + servidor)
 

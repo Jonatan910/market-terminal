@@ -75,7 +75,7 @@ function arrowHead(ctx, a, b, size = 10) {
 }
 
 export function applyStroke(ctx, style, selected) {
-  ctx.strokeStyle = style.color;
+  ctx.strokeStyle = withAlpha(style.color, style.lineOpacity ?? 1); // opacidad de la línea (0 a 1)
   ctx.lineWidth = style.width + (selected ? 0.5 : 0);
   ctx.setLineDash(style.lineStyle === 'dashed' ? [6, 4] : style.lineStyle === 'dotted' ? [1.5, 3] : []);
   ctx.lineCap = 'round';
@@ -117,6 +117,9 @@ export function withAlpha(hex, alpha) {
   const n = parseInt(full, 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
+
+// Opacidad del relleno: la elegida por el usuario o la que trae cada herramienta (`fill`).
+const fillOf = (d, tool) => d.style.fillOpacity ?? TOOLS[tool].fill;
 
 const inBox = (a, b, x, y) =>
   x >= Math.min(a.x, b.x) - TOL && x <= Math.max(a.x, b.x) + TOL && y >= Math.min(a.y, b.y) - TOL && y <= Math.max(a.y, b.y) + TOL;
@@ -311,6 +314,7 @@ export const TOOLS = {
   channel: {
     name: 'Canal paralelo',
     points: 3,
+    fill: 0.12,
     options: ['extend'],
     draw(ctx, d, P, env) {
       const [a, b, c] = P;
@@ -321,7 +325,7 @@ export const TOOLS = {
       const off = channelOffset(a, b, c);
       const s2 = { x: s.x, y: s.y + off };
       const e2 = { x: e.x, y: e.y + off };
-      ctx.fillStyle = withAlpha(d.style.color, 0.12);
+      ctx.fillStyle = withAlpha(d.style.color, fillOf(d, 'channel'));
       ctx.beginPath();
       ctx.moveTo(s.x, s.y);
       ctx.lineTo(e.x, e.y);
@@ -353,6 +357,7 @@ export const TOOLS = {
   fib: {
     name: 'Retroceso de Fibonacci',
     points: 2,
+    fill: 0.12,
     draw(ctx, d, [a, b], env) {
       if (!b) return;
       const [p0, p1] = [d.points[0].price, d.points[1].price];
@@ -364,7 +369,7 @@ export const TOOLS = {
         return { lv, price, y: env.priceToY(price) };
       });
       for (let i = 0; i < levels.length - 1; i++) {
-        ctx.fillStyle = withAlpha(d.style.color, i % 2 ? 0.06 : 0.12);
+        ctx.fillStyle = withAlpha(d.style.color, fillOf(d, 'fib') * (i % 2 ? 0.5 : 1));
         ctx.fillRect(left, levels[i].y, right - left, levels[i + 1].y - levels[i].y);
       }
       for (const L of levels) {
@@ -396,6 +401,7 @@ export const TOOLS = {
   gann: {
     name: 'Cuadrícula de Gann',
     points: 2,
+    fill: 0.09,
     draw(ctx, d, [a, b], env) {
       if (!b) return;
       const color = d.style.color;
@@ -403,7 +409,7 @@ export const TOOLS = {
       const Y = (lv) => a.y + (b.y - a.y) * lv;
       // Fondo con bandas alternadas
       for (let i = 0; i < GANN_LEVELS.length - 1; i++) {
-        ctx.fillStyle = withAlpha(color, i % 2 ? 0.04 : 0.09);
+        ctx.fillStyle = withAlpha(color, fillOf(d, 'gann') * (i % 2 ? 0.45 : 1));
         ctx.fillRect(Math.min(a.x, b.x), Y(GANN_LEVELS[i]), Math.abs(b.x - a.x), Y(GANN_LEVELS[i + 1]) - Y(GANN_LEVELS[i]));
       }
       // Cuadrícula: bordes con el grosor elegido, líneas internas finas
@@ -451,13 +457,14 @@ export const TOOLS = {
   rect: {
     name: 'Rectángulo',
     points: 2,
+    fill: 0.15,
     options: ['extend'],
     draw(ctx, d, [a, b], env) {
       if (!b) return;
       const [x1, x2] = rectX(a, b, d, env);
       const y = Math.min(a.y, b.y);
       const h = Math.abs(b.y - a.y);
-      ctx.fillStyle = withAlpha(d.style.color, 0.15);
+      ctx.fillStyle = withAlpha(d.style.color, fillOf(d, 'rect'));
       ctx.fillRect(x1, y, x2 - x1, h);
       ctx.strokeRect(x1, y, x2 - x1, h);
     },
@@ -470,11 +477,12 @@ export const TOOLS = {
   ellipse: {
     name: 'Elipse',
     points: 2,
+    fill: 0.15,
     draw(ctx, d, [a, b]) {
       if (!b) return;
       ctx.beginPath();
       ctx.ellipse((a.x + b.x) / 2, (a.y + b.y) / 2, Math.abs(b.x - a.x) / 2 || 1, Math.abs(b.y - a.y) / 2 || 1, 0, 0, Math.PI * 2);
-      ctx.fillStyle = withAlpha(d.style.color, 0.15);
+      ctx.fillStyle = withAlpha(d.style.color, fillOf(d, 'ellipse'));
       ctx.fill();
       ctx.stroke();
     },
@@ -519,10 +527,11 @@ export const TOOLS = {
   xabcd: {
     name: 'Patrón XABCD',
     points: 5,
+    fill: 0.15,
     draw(ctx, d, P) {
       const pr = d.points.map((p) => p.price);
       // Triángulos X-A-B y B-C-D rellenos
-      ctx.fillStyle = withAlpha(d.style.color, 0.15);
+      ctx.fillStyle = withAlpha(d.style.color, fillOf(d, 'xabcd'));
       for (const [i, j, k] of [[0, 1, 2], [2, 3, 4]]) {
         if (!P[k]) continue;
         ctx.beginPath();
@@ -594,7 +603,7 @@ export const TOOLS = {
     draw(ctx, d, [a]) {
       ctx.save();
       ctx.font = `${12 + d.style.width * 2}px system-ui, sans-serif`;
-      ctx.fillStyle = d.style.color;
+      ctx.fillStyle = withAlpha(d.style.color, d.style.lineOpacity ?? 1);
       ctx.textBaseline = 'middle';
       ctx.fillText(d.text || 'Texto', a.x, a.y);
       ctx.restore();

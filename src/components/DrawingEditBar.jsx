@@ -51,6 +51,11 @@ export default function DrawingEditBar({ drawing, onUpdate, onDuplicate, onDelet
         </select>
       )}
 
+      {!fixedColors && (
+        <Opacity label={isText ? 'Opacidad' : 'Línea'} value={style.lineOpacity ?? 1} onChange={(v) => setStyle({ lineOpacity: v })} />
+      )}
+      {def.fill != null && <Opacity label="Relleno" value={style.fillOpacity ?? def.fill} onChange={(v) => setStyle({ fillOpacity: v })} />}
+
       {canExtend && (
         <div className="draw-toggles">
           {drawing.type !== 'fib' && (
@@ -80,5 +85,17 @@ export default function DrawingEditBar({ drawing, onUpdate, onDuplicate, onDelet
         <Icon name="trash" size={16} />
       </button>
     </div>
+  );
+}
+
+// Control de opacidad: deslizador de 0 a 100 %.
+function Opacity({ label, value, onChange }) {
+  const pct = Math.round(value * 100);
+  return (
+    <label className="draw-opacity" title={`Opacidad de ${label.toLowerCase()}: ${pct} %`}>
+      <span>{label}</span>
+      <input type="range" min="0" max="100" step="5" value={pct} onChange={(e) => onChange(Number(e.target.value) / 100)} aria-label={`Opacidad de ${label.toLowerCase()}`} />
+      <span className="pct">{pct}%</span>
+    </label>
   );
 }

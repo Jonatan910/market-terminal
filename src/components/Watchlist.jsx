@@ -29,17 +29,25 @@ export default function Watchlist({ lists, tab, onTab, active, onSelect, onRemov
     let cancelled = false;
 
     if (tab === 'crypto') {
-      const tickers = symbols.map((id) => parseId(id).ticker);
-      fetch24h(tickers)
-        .then((rows) => !cancelled && rows.forEach((r) => apply(`crypto:${r.symbol}`, fromTicker(r.lastPrice, r.openPrice))))
-        .catch(() => {});
-      const close = openStream(
-        tickers.map((t) => `${t.toLowerCase()}@miniTicker`),
-        (t) => apply(`crypto:${t.s}`, fromTicker(t.c, t.o)),
-      );
+      // Spot y perpetuos vienen de lugares distintos de Binance: una conexión para cada uno.
+      const closers = [
+        ['crypto', 'spot'],
+        ['perp', 'futures'],
+      ].map(([market, venue]) => {
+        const tickers = symbols.filter((id) => parseId(id).market === market).map((id) => parseId(id).ticker);
+        if (!tickers.length) return () => {};
+        fetch24h(tickers, venue)
+          .then((rows) => !cancelled && rows.forEach((r) => apply(`${market}:${r.symbol}`, fromTicker(r.lastPrice, r.openPrice))))
+          .catch(() => {});
+        return openStream(
+          tickers.map((t) => `${t.toLowerCase()}@miniTicker`),
+          (t) => apply(`${market}:${t.s}`, fromTicker(t.c, t.o)),
+          venue,
+        );
+      });
       return () => {
         cancelled = true;
-        close();
+        closers.forEach((c) => c());
       };
     }
 
@@ -80,7 +88,9 @@ export default function Watchlist({ lists, tab, onTab, active, onSelect, onRemov
           const { market } = parseId(id);
           // Segundo renglón: "BTC/USDT · Binance", "Nasdaq · cerrado" o "Yahoo Finanzas".
           const sub =
-            market === 'crypto'
+            market === 'perp'
+              ? `Perpetuo · ${sourceLabel(id)}`
+              : market === 'crypto'
               ? `${pairLabel(id)} · ${sourceLabel(id)}`
               : [sourceLabel(id, q?.exchange), q?.open === false && 'cerrado'].filter(Boolean).join(' · ');
           return (

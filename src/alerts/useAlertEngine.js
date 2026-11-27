@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { openStream } from '../api/binance';
 import { fetchStockQuotes, STOCK_REFRESH_MS } from '../api/stocks';
-import { fromYahoo, parseId, yahooTicker } from '../api/market';
+import { fromYahoo, isBinance, parseId, yahooTicker } from '../api/market';
 import { shouldTrigger } from './conditions';
 
 // Vigila los precios de los símbolos que tienen alertas activas y llama a onTrigger(alerta, precio)
@@ -30,15 +30,21 @@ export function useAlertEngine(alerts, onTrigger) {
       }
     }
 
-    const crypto = ids.filter((id) => parseId(id).market === 'crypto');
-    const others = ids.filter((id) => parseId(id).market !== 'crypto');
+    const spot = ids.filter((id) => parseId(id).market === 'crypto');
+    const perp = ids.filter((id) => parseId(id).market === 'perp');
+    const others = ids.filter((id) => !isBinance(id));
 
-    const close = crypto.length
-      ? openStream(
-          crypto.map((id) => `${parseId(id).ticker.toLowerCase()}@miniTicker`),
-          (t) => handle(`crypto:${t.s}`, +t.c),
-        )
-      : () => {};
+    // Un WebSocket por venue de Binance (spot y futuros).
+    const stream = (list, market, venue) =>
+      list.length
+        ? openStream(list.map((id) => `${parseId(id).ticker.toLowerCase()}@miniTicker`), (t) => handle(`${market}:${t.s}`, +t.c), venue)
+        : () => {};
+    const closeSpot = stream(spot, 'crypto', 'spot');
+    const closePerp = stream(perp, 'perp', 'futures');
+    const close = () => {
+      closeSpot();
+      closePerp();
+    };
 
     let timer;
     if (others.length) {

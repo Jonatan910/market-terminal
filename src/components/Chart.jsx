@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createChart, CandlestickSeries, HistogramSeries, CrosshairMode, TickMarkType, LineStyle } from 'lightweight-charts';
-import { fetchCandles, fetchOlderCandles, pairLabel, parseId, sourceLabel, subscribeCandles } from '../api/market';
+import { fetchCandles, fetchOlderCandles, isBinance, pairLabel, parseId, sourceLabel, subscribeCandles, venueOf } from '../api/market';
 import { KLINES_LIMIT } from '../api/binance';
 import { formatPrice, priceDecimals } from '../format';
 import { createIndicatorLayer } from '../indicators/layer';
@@ -35,7 +35,7 @@ const toDate = (t) => new Date(t * 1000);
 const VISIBLE_BARS = 150; // velas que se ven al abrir un gráfico (el resto, desplazando a la izquierda)
 const LOAD_MORE_AT = 50; // si quedan menos de 50 velas a la izquierda, se carga más historia
 
-const MARKET_LABEL = { crypto: 'Cripto', stock: 'Acción', forex: 'Forex' };
+const MARKET_LABEL = { crypto: 'Cripto', perp: 'Perpetuo', stock: 'Acción', forex: 'Forex' };
 
 const TOOL_HINT = {
   hline: 'Hacé clic en el precio donde va la línea',
@@ -198,16 +198,20 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     const depth = depthRef.current;
     const heat = heatRef.current;
     setHeatSince(null);
-    if (market !== 'crypto' || (!showBook && !showHeat)) {
+    if (!isBinance(symbol) || (!showBook && !showHeat)) {
       depth.setBook(null);
       heat.setRecorder(null);
       return;
     }
     let latest = null;
-    const close = connectOrderBook(parseId(symbol).ticker, (book) => {
-      latest = book;
-      if (showBook) depth.setBook(book);
-    });
+    const close = connectOrderBook(
+      parseId(symbol).ticker,
+      (book) => {
+        latest = book;
+        if (showBook) depth.setBook(book);
+      },
+      venueOf(symbol),
+    );
     // Mapa de calor: una foto del libro cada 2 s (se graba aunque esté oculto, si el libro está prendido).
     const recorder = getRecorder(symbol);
     heat.setRecorder(showHeat ? recorder : null);
@@ -290,7 +294,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     // Historia hacia atrás: al acercarse al borde izquierdo, pide las velas anteriores
     // y las agrega adelante sin que el gráfico "salte".
     let loading = false;
-    let noMore = market !== 'crypto'; // acciones y forex ya vienen con todo lo disponible
+    let noMore = !isBinance(symbol); // acciones y forex ya vienen con todo lo disponible
     async function loadOlder(range) {
       if (!range || loading || noMore || cancelled || range.from > LOAD_MORE_AT) return;
       loading = true;
@@ -399,7 +403,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
           {MARKET_LABEL[market]} · {sourceLabel(symbol, meta.exchange)}
         </span>
         <span className="muted">{interval}</span>
-        {market === 'crypto' && (
+        {isBinance(symbol) && (
           <button
             className={`chip ${showBook ? 'on' : ''}`}
             onClick={() => setShowBook(!showBook)}
@@ -409,7 +413,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
             Libro de órdenes
           </button>
         )}
-        {market === 'crypto' && (
+        {isBinance(symbol) && (
           <button
             className={`chip ${showHeat ? 'on' : ''}`}
             onClick={() => setShowHeat(!showHeat)}

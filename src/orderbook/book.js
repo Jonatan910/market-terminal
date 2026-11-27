@@ -3,9 +3,14 @@
 //   2) se pide una foto completa (REST /depth) que trae su número de versión (lastUpdateId);
 //   3) se descartan los cambios viejos y se aplican los nuevos en orden.
 // Si se pierde un cambio (salto en la numeración), hay que pedir otra foto.
+//
+// Spot y futuros encadenan los cambios distinto:
+//   spot:    cada cambio empieza justo después del anterior (U = último u + 1)
+//   futures: cada cambio trae `pu` = el u del cambio anterior
 
 export class OrderBook {
-  constructor() {
+  constructor(mode = 'spot') {
+    this.mode = mode;
     this.bids = new Map(); // precio -> cantidad (órdenes de compra)
     this.asks = new Map(); // precio -> cantidad (órdenes de venta)
     this.lastId = null; // versión de la última actualización aplicada
@@ -27,9 +32,15 @@ export class OrderBook {
   // Devuelve 'applied', 'skipped' (era viejo) o 'gap' (se perdió algo: pedir foto nueva).
   apply(ev) {
     if (!this.ready) return 'skipped';
-    if (ev.u <= this.lastId) return 'skipped';
-    const expected = this.lastId + 1;
-    if (!this.synced ? ev.U > expected : ev.U !== expected) return 'gap';
+    if (this.mode === 'futures') {
+      if (ev.u < this.lastId) return 'skipped';
+      // Primer cambio: tiene que "cubrir" la foto. Después: pu tiene que ser el último aplicado.
+      if (!this.synced ? !(ev.U <= this.lastId && ev.u >= this.lastId) : ev.pu !== this.lastId) return 'gap';
+    } else {
+      if (ev.u <= this.lastId) return 'skipped';
+      const expected = this.lastId + 1;
+      if (!this.synced ? ev.U > expected : ev.U !== expected) return 'gap';
+    }
     for (const [p, q] of ev.b) setLevel(this.bids, +p, +q);
     for (const [p, q] of ev.a) setLevel(this.asks, +p, +q);
     this.lastId = ev.u;

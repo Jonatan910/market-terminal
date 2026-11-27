@@ -2,8 +2,8 @@
 import { fetchDepth, openStream } from '../api/binance';
 import { OrderBook } from './book';
 
-export function connectOrderBook(ticker, onChange) {
-  const book = new OrderBook();
+export function connectOrderBook(ticker, onChange, venue = 'spot') {
+  const book = new OrderBook(venue);
   let buffer = []; // cambios que llegan mientras se pide la foto
   let loading = false;
   let closed = false;
@@ -13,7 +13,7 @@ export function connectOrderBook(ticker, onChange) {
     loading = true;
     book.lastId = null;
     try {
-      const snap = await fetchDepth(ticker);
+      const snap = await fetchDepth(ticker, venue);
       if (closed) return;
       book.loadSnapshot(snap);
       for (const ev of buffer) if (book.apply(ev) === 'gap') throw new Error('salto');
@@ -28,7 +28,9 @@ export function connectOrderBook(ticker, onChange) {
   }
 
   let started = false;
-  const close = openStream([`${ticker.toLowerCase()}@depth@100ms`], (ev) => {
+  const close = openStream(
+    [`${ticker.toLowerCase()}@depth@100ms`],
+    (ev) => {
     if (!book.ready) {
       buffer.push(ev);
       if (buffer.length > 500) buffer.shift();
@@ -45,7 +47,9 @@ export function connectOrderBook(ticker, onChange) {
       buffer = [ev];
       resync();
     }
-  });
+    },
+    venue,
+  );
 
   return () => {
     closed = true;

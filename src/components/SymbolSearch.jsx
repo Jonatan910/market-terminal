@@ -6,6 +6,7 @@ import { searchForex } from '../api/forex';
 // Buscador de cripto, acciones y forex: escribís "sol", "apple" o "eur" y sugiere de los tres mercados.
 export default function SymbolSearch({ onPick }) {
   const [cryptoList, setCryptoList] = useState([]);
+  const [perpList, setPerpList] = useState([]); // perpetuos de Binance Futuros
   const [stockResults, setStockResults] = useState([]);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -15,6 +16,7 @@ export default function SymbolSearch({ onPick }) {
   // La lista de pares cripto se pide una sola vez, la primera vez que tocás el buscador.
   function loadOnce() {
     if (!cryptoList.length) fetchUsdtSymbols().then(setCryptoList).catch(() => {});
+    if (!perpList.length) fetchUsdtSymbols('futures').then(setPerpList).catch(() => {});
   }
 
   // Acciones: se buscan en el servidor, esperando 250 ms a que termines de escribir ("debounce").
@@ -53,6 +55,20 @@ export default function SymbolSearch({ onPick }) {
       tag: s.type === 'ETF' ? 'ETF' : 'Acción',
       exact: s.symbol === q,
     }));
+    // Perpetuos: los que coinciden con el código (BTC, BTCUSDT.P o BTCPERP → BTCUSDT.P).
+    const wantsPerp = /(\.P|PERP)$/.test(q);
+    const qp = q.replace(/(\.P|PERP)$/, '').replace(/USDT$/, '');
+    const perps = perpList
+      .filter((s) => s.base.startsWith(qp))
+      .sort((a, b) => a.base.length - b.base.length)
+      .slice(0, 3)
+      .map((s) => ({
+        id: `perp:${s.symbol}`,
+        title: `${s.symbol}.P`,
+        subtitle: `${s.base}/USDT perpetuo · Binance Futuros`,
+        tag: 'Perpetuo',
+        exact: wantsPerp && s.base === qp,
+      }));
     const forex = searchForex(query)
       .slice(0, 4)
       .map((p) => ({
@@ -63,8 +79,8 @@ export default function SymbolSearch({ onPick }) {
         exact: p.ticker === q,
       }));
     // Las coincidencias exactas van primero (escribir "AAPL", "BTC" o "EURUSD" y Enter abre ese).
-    return [...crypto, ...stocks, ...forex].sort((a, b) => b.exact - a.exact);
-  }, [cryptoList, stockResults, query]);
+    return [...crypto, ...perps, ...stocks, ...forex].sort((a, b) => b.exact - a.exact);
+  }, [cryptoList, perpList, stockResults, query]);
 
   // Cerrar la lista al hacer clic afuera.
   useEffect(() => {
