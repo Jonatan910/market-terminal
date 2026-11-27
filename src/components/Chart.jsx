@@ -9,6 +9,7 @@ import { createDepthPrimitive } from '../orderbook/depthPrimitive';
 import { connectOrderBook } from '../orderbook/live';
 import { createHeatmapPrimitive } from '../orderbook/heatmapPrimitive';
 import { getRecorder, SAMPLE_MS } from '../orderbook/heatmap';
+import { createVolumeProfilePrimitive } from '../indicators/volumeProfilePrimitive';
 import DrawingToolbar from './DrawingToolbar';
 import DrawingEditBar from './DrawingEditBar';
 import FavoritesBar from './FavoritesBar';
@@ -93,6 +94,9 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
   const [showHeat, setShowHeat] = useLocalStorage('mt.heatmap', true); // mapa de calor de liquidez
   const heatRef = useRef(null);
   const [heatSince, setHeatSince] = useState(null); // desde qué hora se está grabando
+  const [showVP, setShowVP] = useLocalStorage('mt.vprofile', true); // perfil de volumen
+  const [hasVolume, setHasVolume] = useState(true); // forex no tiene volumen
+  const vpRef = useRef(null);
   const toggleFavorite = (id) => setFavorites((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
   // Herramientas nuevas: se suman una sola vez a los favoritos ya guardados (al lado de su vecina).
   useEffect(() => {
@@ -160,6 +164,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     // Orden de dibujo: primero el mapa de calor (fondo), después el libro, después las velas.
     heatRef.current = createHeatmapPrimitive(chart, candlesRef.current);
     depthRef.current = createDepthPrimitive(candlesRef.current);
+    vpRef.current = createVolumeProfilePrimitive(chart, candlesRef.current);
     drawRef.current = createDrawingController({
       chart,
       series: candlesRef.current,
@@ -230,6 +235,11 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     };
   }, [symbol, market, showBook, showHeat]);
 
+  // Perfil de volumen: solo si el mercado tiene volumen (forex no).
+  useEffect(() => {
+    vpRef.current.setVisible(showVP && hasVolume);
+  }, [showVP, hasVolume]);
+
   // Alertas del símbolo: línea naranja punteada con 🔔 en el precio de cada una.
   useEffect(() => {
     const series = candlesRef.current;
@@ -289,6 +299,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
       layerRef.current.setBars(bars);
       drawRef.current.setBars(bars);
       heatRef.current.setBars(bars);
+      vpRef.current.setBars(bars);
     }
 
     // Historia hacia atrás: al acercarse al borde izquierdo, pide las velas anteriores
@@ -332,6 +343,8 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
         candlesRef.current.applyOptions({ priceFormat });
         // El forex no tiene volumen: se oculta y el precio usa ese espacio.
         const hasVolume = candles.some((c) => c.volume > 0);
+        setHasVolume(hasVolume);
+        vpRef.current.setFormatter((n) => formatPrice(n, market));
         volumeRef.current.applyOptions({ visible: hasVolume });
         candlesRef.current.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: hasVolume ? 0.25 : 0.08 } });
         layerRef.current.setPriceFormat(priceFormat);
@@ -367,6 +380,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
           // si cambió una anterior (pasa con acciones), se recalcula todo.
           if (i < 0 || i === bars.length - 1) layerRef.current.updateLast(barsRef.current);
           else layerRef.current.setBars(barsRef.current);
+          vpRef.current.setBars(barsRef.current, { live: true });
           if (bars.length !== barsRef.current.length) {
             // vela nueva
             drawRef.current.setBars(barsRef.current);
@@ -403,6 +417,16 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
           {MARKET_LABEL[market]} · {sourceLabel(symbol, meta.exchange)}
         </span>
         <span className="muted">{interval}</span>
+        {hasVolume && (
+          <button
+            className={`chip ${showVP ? 'on' : ''}`}
+            onClick={() => setShowVP(!showVP)}
+            aria-pressed={showVP}
+            title="Perfil de volumen de lo que se ve: cuánto se operó en cada precio (verde compras, rojo ventas), con el POC (precio con más volumen) y el área de valor (70 % del volumen)."
+          >
+            Perfil de volumen
+          </button>
+        )}
         {isBinance(symbol) && (
           <button
             className={`chip ${showBook ? 'on' : ''}`}

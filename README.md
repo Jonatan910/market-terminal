@@ -28,6 +28,10 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 - **Mapa de calor de liquidez** (cripto): cada 2 s se guarda una foto del libro y se dibuja detrás de las
   velas; azul/celeste = poca liquidez, amarillo/naranja = órdenes grandes esperando. Binance no da la
   historia del libro, así que se arma desde que abrís la página (guarda hasta 3 horas por símbolo).
+- **Perfil de volumen** (lo visible en pantalla): cuánto se operó en cada precio, compras en verde y
+  ventas en rojo, con el **POC** (precio con más volumen) y el **área de valor** (70 % del volumen).
+  Se recalcula al desplazar o hacer zoom. En cripto usa el volumen comprado a mercado de Binance;
+  en acciones lo estima por dónde cerró cada vela. Forex no tiene volumen.
 - Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI, MACD, **CVD** y
   **Delta de volumen** (compras − ventas agresivas, solo cripto) en paneles propios.
   Se pueden agregar varias veces (por ejemplo EMA 20 y EMA 50), cambiar sus valores y su color.
@@ -132,6 +136,8 @@ src/
   orderbook/heatmapPrimitive.js dibujo del mapa de calor detrás de las velas
   indicators/calc.test.js  pruebas de los cálculos (npm test)
   indicators/catalog.js    lista de indicadores: parámetros y cómo se dibujan
+  indicators/volumeProfile.js cálculo del perfil de volumen, POC y área de valor (con pruebas)
+  indicators/volumeProfilePrimitive.js dibujo del perfil a la izquierda del gráfico
   indicators/layer.js      dibuja los indicadores sobre el gráfico
   hooks/useLocalStorage.js estado que se guarda en el navegador
   format.js                formato de precios y porcentajes
@@ -140,7 +146,6 @@ src/
 
 ## Próximos pasos
 
-- Perfil de volumen (compras/ventas por precio).
 - Grabar el mapa de calor en un servidor para tener historia aunque la página esté cerrada.
 - Más indicadores: VWAP, Estocástico, ATR, Ichimoku.
 - Alertas que avisen con la página cerrada (servidor + Telegram).
