@@ -7,6 +7,8 @@ import { createIndicatorLayer } from '../indicators/layer';
 import { createDrawingController } from '../drawings/controller';
 import { createDepthPrimitive } from '../orderbook/depthPrimitive';
 import { connectOrderBook } from '../orderbook/live';
+import { createHeatmapPrimitive } from '../orderbook/heatmapPrimitive';
+import { getRecorder, SAMPLE_MS } from '../orderbook/heatmap';
 import DrawingToolbar from './DrawingToolbar';
 import DrawingEditBar from './DrawingEditBar';
 import FavoritesBar from './FavoritesBar';
@@ -88,6 +90,9 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
   const [favPos, setFavPos] = useLocalStorage('mt.favPos', null);
   const [showBook, setShowBook] = useLocalStorage('mt.orderbook', true); // libro de órdenes a la derecha
   const depthRef = useRef(null);
+  const [showHeat, setShowHeat] = useLocalStorage('mt.heatmap', true); // mapa de calor de liquidez
+  const heatRef = useRef(null);
+  const [heatSince, setHeatSince] = useState(null); // desde qué hora se está grabando
   const toggleFavorite = (id) => setFavorites((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
   // Herramientas nuevas: se suman una sola vez a los favoritos ya guardados (al lado de su vecina).
   useEffect(() => {
@@ -152,6 +157,8 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     candlesRef.current.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.25 } });
 
     layerRef.current = createIndicatorLayer(chart);
+    // Orden de dibujo: primero el mapa de calor (fondo), después el libro, después las velas.
+    heatRef.current = createHeatmapPrimitive(chart, candlesRef.current);
     depthRef.current = createDepthPrimitive(candlesRef.current);
     drawRef.current = createDrawingController({
       chart,
@@ -186,19 +193,38 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     setIndLegend(layerRef.current.legend(null));
   }, [indicators]);
 
-  // Libro de órdenes en vivo (solo cripto, Binance).
+  // Libro de órdenes en vivo (solo cripto, Binance) y mapa de calor que se graba a partir de él.
   useEffect(() => {
     const depth = depthRef.current;
-    if (market !== 'crypto' || !showBook) {
+    const heat = heatRef.current;
+    setHeatSince(null);
+    if (market !== 'crypto' || (!showBook && !showHeat)) {
       depth.setBook(null);
+      heat.setRecorder(null);
       return;
     }
-    const close = connectOrderBook(parseId(symbol).ticker, (book) => depth.setBook(book));
+    let latest = null;
+    const close = connectOrderBook(parseId(symbol).ticker, (book) => {
+      latest = book;
+      if (showBook) depth.setBook(book);
+    });
+    // Mapa de calor: una foto del libro cada 2 s (se graba aunque esté oculto, si el libro está prendido).
+    const recorder = getRecorder(symbol);
+    heat.setRecorder(showHeat ? recorder : null);
+    setHeatSince(recorder.since);
+    const timer = setInterval(() => {
+      if (recorder.sample(latest)) {
+        if (showHeat) heat.refresh();
+        setHeatSince(recorder.since);
+      }
+    }, SAMPLE_MS);
     return () => {
       close();
+      clearInterval(timer);
       depth.setBook(null);
+      heat.setRecorder(null);
     };
-  }, [symbol, market, showBook]);
+  }, [symbol, market, showBook, showHeat]);
 
   // Alertas del símbolo: línea naranja punteada con 🔔 en el precio de cada una.
   useEffect(() => {
@@ -258,6 +284,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
       volumeRef.current.setData(bars.map(volBar));
       layerRef.current.setBars(bars);
       drawRef.current.setBars(bars);
+      heatRef.current.setBars(bars);
     }
 
     // Historia hacia atrás: al acercarse al borde izquierdo, pide las velas anteriores
@@ -336,7 +363,11 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
           // si cambió una anterior (pasa con acciones), se recalcula todo.
           if (i < 0 || i === bars.length - 1) layerRef.current.updateLast(barsRef.current);
           else layerRef.current.setBars(barsRef.current);
-          if (bars.length !== barsRef.current.length) drawRef.current.setBars(barsRef.current); // vela nueva
+          if (bars.length !== barsRef.current.length) {
+            // vela nueva
+            drawRef.current.setBars(barsRef.current);
+            heatRef.current.setBars(barsRef.current);
+          }
           if (!hoverRef.current) setIndLegend(layerRef.current.legend(null));
           setLast(c);
         });
@@ -376,6 +407,16 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
             title="Libro de órdenes de Binance en vivo, a la derecha del gráfico (verde: compras esperando, rojo: ventas)"
           >
             Libro de órdenes
+          </button>
+        )}
+        {market === 'crypto' && (
+          <button
+            className={`chip ${showHeat ? 'on' : ''}`}
+            onClick={() => setShowHeat(!showHeat)}
+            aria-pressed={showHeat}
+            title="Mapa de calor de liquidez: dónde hubo órdenes grandes esperando. Se graba desde que abrís la página (Binance no da la historia)."
+          >
+            Mapa de calor{showHeat && heatSince ? ` · desde ${F.time.format(toDate(heatSince))}` : showHeat ? ' · grabando…' : ''}
           </button>
         )}
         {shown && (
