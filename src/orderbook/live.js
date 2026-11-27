@@ -7,6 +7,7 @@ export function connectOrderBook(ticker, onChange, venue = 'spot', onStatus = ()
   const status = { events: 0, snapshots: 0, gaps: 0, error: null };
   const book = new OrderBook(venue);
   let buffer = []; // cambios que llegan mientras se pide la foto
+  let failures = 0;
   let loading = false;
   let closed = false;
 
@@ -18,6 +19,7 @@ export function connectOrderBook(ticker, onChange, venue = 'spot', onStatus = ()
       const snap = await fetchDepth(ticker, venue);
       status.snapshots++;
       status.error = null;
+      failures = 0;
       onStatus(status);
       if (closed) return;
       book.loadSnapshot(snap);
@@ -28,7 +30,13 @@ export function connectOrderBook(ticker, onChange, venue = 'spot', onStatus = ()
       status.error = e.message;
       onStatus(status);
       // Se reintenta en unos segundos (por ejemplo, si se perdió la conexión).
-      if (!closed) setTimeout(() => ((loading = false), resync()), 3000);
+      // Si Binance bloqueó por exceso de pedidos ("banned until <hora>"), se espera hasta esa hora;
+      // si no, cada vez un poco más (5 s, 10 s, 20 s… hasta 5 min) para no empeorar el bloqueo.
+      failures++;
+      const until = Number(/banned until (\d+)/.exec(e.message)?.[1]);
+      const wait = until > Date.now() ? until - Date.now() + 5000 : Math.min(300000, 5000 * 2 ** (failures - 1));
+      status.retryAt = Date.now() + wait;
+      if (!closed) setTimeout(() => ((loading = false), resync()), wait);
       return;
     }
     loading = false;

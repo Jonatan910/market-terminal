@@ -16,7 +16,7 @@
 import http from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { connectOrderBook } from '../src/orderbook/live.js';
-import { openStream } from '../src/api/binance.js';
+import { openStream, VENUES } from '../src/api/binance.js';
 import { bucketizeBook, niceStep } from '../src/orderbook/heatmap.js';
 import { encodeMinute, decodeMinute } from './codec.js';
 import { createStore } from './store.js';
@@ -31,6 +31,11 @@ const PORT = Number(process.env.PORT) || 8787;
 const startedAt = Date.now();
 
 // Si la base de datos rechaza la conexión, se explica en castellano qué revisar (en vez del error técnico).
+// En el servidor la foto del libro de spot es de 1000 precios por lado (5 veces menos "peso" para
+// Binance que 5000): la dirección de internet de Render es compartida y Binance limita por dirección.
+// El libro se completa solo con los cambios en vivo.
+VENUES.spot.depthLimit = Number(process.env.SPOT_DEPTH_LIMIT) || 1000;
+
 let store;
 try {
   store = await createStore();
@@ -54,7 +59,7 @@ const recorders = new Map();
 for (const id of SYMBOLS) {
   const [market, ticker] = id.split(':');
   const venue = market === 'perp' ? 'futures' : 'spot';
-  const r = { id, step: null, book: null, columns: [], bubbles: new Map(), lastSample: null, saved: 0, errors: 0, trades: 0, bookStatus: null };
+  const r = { id, step: null, book: null, columns: [], bubbles: new Map(), lastSample: null, saved: 0, errors: 0, trades: 0, bookStatus: null, tradeUrl: null };
   recorders.set(id, r);
 
   connectOrderBook(ticker, (book) => (r.book = book), venue, (s) => (r.bookStatus = { ...s }));
@@ -72,6 +77,7 @@ for (const id of SYMBOLS) {
       r.bubbles.set(key, b);
     },
     venue,
+    { onUrl: (u) => (r.tradeUrl = u) },
   );
 }
 
@@ -207,6 +213,7 @@ http
             errores: r.errors,
             // Diagnóstico: mensajes recibidos y último error del libro de órdenes.
             operacionesRecibidas: r.trades,
+            direccionOperaciones: r.tradeUrl,
             libro: r.bookStatus ?? { events: 0, snapshots: 0, gaps: 0, error: 'sin mensajes del libro todavía' },
           };
         }

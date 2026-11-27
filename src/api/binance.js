@@ -7,7 +7,8 @@
 export const VENUES = {
   spot: {
     rest: ['https://data-api.binance.vision', 'https://api.binance.com'],
-    ws: 'wss://data-stream.binance.vision/stream',
+    // Direcciones en vivo, en orden de preferencia: si una no manda nada, se prueba la siguiente.
+    ws: ['wss://data-stream.binance.vision/stream', 'wss://stream.binance.com:9443/stream'],
     klines: '/api/v3/klines',
     depth: '/api/v3/depth',
     depthLimit: 5000,
@@ -15,7 +16,9 @@ export const VENUES = {
   futures: {
     rest: ['https://fapi.binance.com'],
     proxy: './api/fapi', // plan B: mismo pedido, a través de Vercel
-    ws: 'wss://fstream.binance.com/stream',
+    // Binance reorganizó las conexiones de futuros ("/market" para operaciones y velas, "/public" para el libro):
+    // se prueban en orden hasta que una mande datos.
+    ws: ['wss://fstream.binance.com/stream', 'wss://fstream.binance.com/market/stream', 'wss://fstream.binance.com/public/stream'],
     klines: '/fapi/v1/klines',
     depth: '/fapi/v1/depth',
     depthLimit: 1000, // futuros: máximo 1000 precios por lado
@@ -103,20 +106,38 @@ export async function fetchUsdtSymbols(venue = 'spot') {
 }
 
 // Abre un WebSocket combinado (varios "streams" en una conexión) y se reconecta solo.
+// Si una dirección se conecta pero no manda ningún mensaje en `silenceMs`, prueba la siguiente
+// (Binance a veces cambia qué datos sirve cada dirección). `onUrl` avisa cuál se está usando.
 // Devuelve una función para cerrarlo.
-export function openStream(streams, onMessage, venue = 'spot') {
+export function openStream(streams, onMessage, venue = 'spot', { silenceMs = 30000, onUrl } = {}) {
+  const urls = VENUES[venue].ws;
   let ws;
   let closed = false;
   let retry = 0;
+  let urlIdx = 0;
+  let working = false; // una vez que una dirección mandó datos, nos quedamos con ella
 
   function connect() {
-    ws = new WebSocket(`${VENUES[venue].ws}?streams=${streams.join('/')}`);
+    const url = urls[urlIdx % urls.length];
+    onUrl?.(url);
+    ws = new WebSocket(`${url}?streams=${streams.join('/')}`);
+    let got = false;
+    const silence = setTimeout(() => {
+      if (!got && !working && !closed) {
+        urlIdx++; // nada en 30 s: probar la próxima dirección
+        retry = 0;
+        ws.close();
+      }
+    }, silenceMs);
     ws.onopen = () => (retry = 0);
     ws.onmessage = (e) => {
+      got = true;
+      working = true;
       const msg = JSON.parse(e.data);
       if (msg.data) onMessage(msg.data);
     };
     ws.onclose = () => {
+      clearTimeout(silence);
       if (closed) return;
       retry = Math.min(retry + 1, 6);
       setTimeout(connect, 500 * 2 ** retry); // espera cada vez más entre intentos
