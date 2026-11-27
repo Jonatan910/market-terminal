@@ -30,7 +30,21 @@ const RETENTION_DAYS = Number(process.env.RETENTION_DAYS) || 7;
 const PORT = Number(process.env.PORT) || 8787;
 const startedAt = Date.now();
 
-const store = await createStore();
+// Si la base de datos rechaza la conexión, se explica en castellano qué revisar (en vez del error técnico).
+let store;
+try {
+  store = await createStore();
+} catch (e) {
+  const hints = {
+    '28P01': 'La contraseña de DATABASE_URL es incorrecta. Revisá que no quede [YOUR-PASSWORD] ni corchetes, y que sea la contraseña de la base de datos (Project Settings → Database). Si tiene símbolos como @ # / ? %, cambiala por una con solo letras y números.',
+    ENOTFOUND: 'No se encuentra el servidor de la base de datos: revisá la dirección (host) en DATABASE_URL.',
+    ECONNREFUSED: 'La base de datos rechazó la conexión: revisá el puerto (5432 para Session pooler).',
+    XX000: 'Supabase no reconoce el usuario: en DATABASE_URL tiene que ser postgres.<código-del-proyecto> (conexión "Session pooler").',
+  };
+  console.error(`No se pudo conectar a la base de datos (${e.code || 'sin código'}): ${e.message}`);
+  console.error(hints[e.code] || 'Revisá la variable DATABASE_URL en Render (Environment).');
+  process.exit(1);
+}
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 log(`Grabando ${SYMBOLS.join(', ')} · ${RETENTION_DAYS} días · guardado en ${store.kind}`);
 
