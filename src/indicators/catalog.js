@@ -87,6 +87,37 @@ export const INDICATORS = {
     levels: [0],
     compute: (bars) => ({ value: volumeDelta(bars) }),
   },
+  // --- Herramientas de mercado: no son líneas, se dibujan aparte (ver Chart.jsx). Una de cada una. ---
+  vprofile: {
+    name: 'Perfil de volumen (rango visible)',
+    short: 'Perfil de volumen',
+    special: true,
+    unique: true,
+    pane: 'overlay',
+    params: [
+      { key: 'rows', label: 'Filas', default: 60, min: 10, max: 200 },
+      { key: 'va', label: 'Área de valor %', default: 70, min: 50, max: 95 },
+    ],
+    outputs: [],
+  },
+  orderbook: {
+    name: 'Libro de órdenes en vivo (cripto)',
+    short: 'Libro de órdenes',
+    special: true,
+    unique: true,
+    pane: 'overlay',
+    params: [],
+    outputs: [],
+  },
+  heatmap: {
+    name: 'Mapa de calor de liquidez (cripto)',
+    short: 'Mapa de calor',
+    special: true,
+    unique: true,
+    pane: 'overlay',
+    params: [],
+    outputs: [],
+  },
 };
 
 // Colores que se van asignando a cada indicador nuevo.
@@ -116,5 +147,6 @@ export function defaultIndicators() {
   list.push({ ...newInstance('ema', list), color: '#f5c518' });
   list.push({ ...newInstance('ema', list), params: { period: 50 }, color: '#4c8dff' });
   list.push({ ...newInstance('rsi', list), color: '#e040fb' });
+  for (const type of ['vprofile', 'orderbook', 'heatmap']) list.push(newInstance(type, list));
   return list;
 }

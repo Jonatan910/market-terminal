@@ -4,7 +4,6 @@
 import { computeProfile } from './volumeProfile';
 
 const MAX_WIDTH = 0.25; // la fila con más volumen ocupa el 25 % del ancho del gráfico
-const ROWS = 60;
 const COLORS = {
   buy: 'rgba(38, 166, 154, 0.5)',
   sell: 'rgba(239, 83, 80, 0.5)',
@@ -20,6 +19,7 @@ export function createVolumeProfilePrimitive(chart, series) {
   let formatPrice = (n) => String(n);
   let requestUpdate = () => {};
   let timer = null;
+  let options = { rows: 60, valueArea: 0.7 };
 
   // Recalcula con las velas que se ven (con un pequeño retraso para no hacerlo en cada píxel de arrastre).
   function schedule(delay = 80) {
@@ -32,7 +32,7 @@ export function createVolumeProfilePrimitive(chart, series) {
       } else {
         const from = Math.max(0, Math.floor(r.from));
         const to = Math.min(bars.length - 1, Math.ceil(r.to));
-        profile = to >= from ? computeProfile(bars.slice(from, to + 1), { rows: ROWS }) : null;
+        profile = to >= from ? computeProfile(bars.slice(from, to + 1), options) : null;
       }
       requestUpdate();
     }, delay);
@@ -139,6 +139,11 @@ export function createVolumeProfilePrimitive(chart, series) {
     setBars(list, { live = false } = {}) {
       bars = list;
       schedule(live ? 1000 : 0);
+    },
+    setOptions(o) {
+      if (o.rows === options.rows && o.valueArea === options.valueArea) return;
+      options = o;
+      schedule(0);
     },
     setFormatter(fn) {
       formatPrice = fn;

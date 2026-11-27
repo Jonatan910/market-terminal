@@ -19,7 +19,9 @@ export default function IndicatorsPanel({ value, onChange }) {
     };
   }, [open]);
 
-  const add = (type) => onChange([...value, newInstance(type, value)]);
+  // Las herramientas de mercado (perfil, libro, mapa de calor) se agregan una sola vez.
+  const has = (type) => value.some((i) => i.type === type);
+  const add = (type) => !(INDICATORS[type].unique && has(type)) && onChange([...value, newInstance(type, value)]);
   const remove = (uid) => onChange(value.filter((i) => i.uid !== uid));
   const update = (uid, patch) => onChange(value.map((i) => (i.uid === uid ? { ...i, ...patch } : i)));
 
@@ -34,9 +36,9 @@ export default function IndicatorsPanel({ value, onChange }) {
           <h3>Agregar</h3>
           <div className="ind-add">
             {Object.entries(INDICATORS).map(([type, def]) => (
-              <button key={type} onClick={() => add(type)} title={def.name}>
+              <button key={type} onClick={() => add(type)} title={def.name} disabled={def.unique && has(type)}>
                 <strong>{def.short}</strong>
-                <span className="muted">{def.name}</span>
+                <span className="muted">{def.unique && has(type) ? 'Ya está en el gráfico' : def.name}</span>
               </button>
             ))}
           </div>
@@ -49,10 +51,12 @@ export default function IndicatorsPanel({ value, onChange }) {
               return (
                 <li key={inst.uid}>
                   <div className="ind-head">
+                    {!def.special && (
                     <label className="swatch" style={{ background: inst.color }} title="Cambiar color">
                       <input type="color" value={inst.color} onChange={(e) => update(inst.uid, { color: e.target.value })} aria-label={`Color de ${instanceLabel(inst)}`} />
                     </label>
-                    <strong>{instanceLabel(inst)}</strong>
+                    )}
+                    <strong>{def.special ? def.short : instanceLabel(inst)}</strong>
                     <button className="remove" onClick={() => remove(inst.uid)} aria-label={`Quitar ${instanceLabel(inst)}`} title="Quitar">
                       ×
                     </button>

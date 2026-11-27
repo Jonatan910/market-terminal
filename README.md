@@ -24,13 +24,13 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
   precio con los decimales de cada mercado, variación y aviso de mercado cerrado.
 - **Libro de órdenes en vivo** (cripto, Binance) a la derecha del gráfico: compras en verde, ventas en rojo,
   con la "pared" más grande de cada lado marcada. Se arma con la foto de 5000 precios por lado y los
-  cambios en vivo cada 100 ms (como recomienda Binance). Se prende/apaga con el botón "Libro de órdenes".
+  cambios en vivo cada 100 ms (como recomienda Binance). Se agrega o quita desde ƒx Indicadores.
 - **Mapa de calor de liquidez** (cripto): cada 2 s se guarda una foto del libro y se dibuja detrás de las
   velas; azul/celeste = poca liquidez, amarillo/naranja = órdenes grandes esperando. Binance no da la
   historia del libro, así que se arma desde que abrís la página (guarda hasta 3 horas por símbolo).
 - **Perfil de volumen** (lo visible en pantalla): cuánto se operó en cada precio, compras en verde y
   ventas en rojo, con el **POC** (precio con más volumen) y el **área de valor** (70 % del volumen).
-  Se recalcula al desplazar o hacer zoom. En cripto usa el volumen comprado a mercado de Binance;
+  Se recalcula al desplazar o hacer zoom. Se agrega desde ƒx Indicadores (filas y % del área de valor configurables). En cripto usa el volumen comprado a mercado de Binance;
   en acciones lo estima por dónde cerró cada vela. Forex no tiene volumen.
 - Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI, MACD, **CVD** y
   **Delta de volumen** (compras − ventas agresivas, solo cripto) en paneles propios.

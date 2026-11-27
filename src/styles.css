@@ -391,3 +391,6 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .draw-opacity { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
 .draw-opacity input { width: 64px; accent-color: var(--accent); }
 .draw-opacity .pct { width: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+
+.ind-add button:disabled { opacity: .45; cursor: default; }
+.ind-add button:disabled:hover { border-color: var(--border); }

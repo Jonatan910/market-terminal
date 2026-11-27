@@ -89,12 +89,14 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
   // En el celular arranca oculta (tapa mucho gráfico); se muestra con la ★ de la barra izquierda.
   const [favBar, setFavBar] = useLocalStorage('mt.favBar', () => window.innerWidth > 760);
   const [favPos, setFavPos] = useLocalStorage('mt.favPos', null);
-  const [showBook, setShowBook] = useLocalStorage('mt.orderbook', true); // libro de órdenes a la derecha
   const depthRef = useRef(null);
-  const [showHeat, setShowHeat] = useLocalStorage('mt.heatmap', true); // mapa de calor de liquidez
   const heatRef = useRef(null);
   const [heatSince, setHeatSince] = useState(null); // desde qué hora se está grabando
-  const [showVP, setShowVP] = useLocalStorage('mt.vprofile', true); // perfil de volumen
+  // Herramientas de mercado: se prenden agregándolas como indicadores (panel ƒx Indicadores).
+  const vpInst = indicators.find((i) => i.type === 'vprofile');
+  const showVP = Boolean(vpInst);
+  const showBook = indicators.some((i) => i.type === 'orderbook');
+  const showHeat = indicators.some((i) => i.type === 'heatmap');
   const [hasVolume, setHasVolume] = useState(true); // forex no tiene volumen
   const vpRef = useRef(null);
   const toggleFavorite = (id) => setFavorites((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
@@ -237,8 +239,9 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
 
   // Perfil de volumen: solo si el mercado tiene volumen (forex no).
   useEffect(() => {
+    vpRef.current.setOptions({ rows: vpInst?.params.rows ?? 60, valueArea: (vpInst?.params.va ?? 70) / 100 });
     vpRef.current.setVisible(showVP && hasVolume);
-  }, [showVP, hasVolume]);
+  }, [showVP, hasVolume, vpInst?.params.rows, vpInst?.params.va]);
 
   // Alertas del símbolo: línea naranja punteada con 🔔 en el precio de cada una.
   useEffect(() => {
@@ -417,36 +420,6 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
           {MARKET_LABEL[market]} · {sourceLabel(symbol, meta.exchange)}
         </span>
         <span className="muted">{interval}</span>
-        {hasVolume && (
-          <button
-            className={`chip ${showVP ? 'on' : ''}`}
-            onClick={() => setShowVP(!showVP)}
-            aria-pressed={showVP}
-            title="Perfil de volumen de lo que se ve: cuánto se operó en cada precio (verde compras, rojo ventas), con el POC (precio con más volumen) y el área de valor (70 % del volumen)."
-          >
-            Perfil de volumen
-          </button>
-        )}
-        {isBinance(symbol) && (
-          <button
-            className={`chip ${showBook ? 'on' : ''}`}
-            onClick={() => setShowBook(!showBook)}
-            aria-pressed={showBook}
-            title="Libro de órdenes de Binance en vivo, a la derecha del gráfico (verde: compras esperando, rojo: ventas)"
-          >
-            Libro de órdenes
-          </button>
-        )}
-        {isBinance(symbol) && (
-          <button
-            className={`chip ${showHeat ? 'on' : ''}`}
-            onClick={() => setShowHeat(!showHeat)}
-            aria-pressed={showHeat}
-            title="Mapa de calor de liquidez: dónde hubo órdenes grandes esperando. Se graba desde que abrís la página (Binance no da la historia)."
-          >
-            Mapa de calor{showHeat && heatSince ? ` · desde ${F.time.format(toDate(heatSince))}` : showHeat ? ' · grabando…' : ''}
-          </button>
-        )}
         {shown && (
           <span className={change >= 0 ? 'up' : 'down'}>
             Ap {formatPrice(shown.open, market)} · Máx {formatPrice(shown.high, market)} · Mín {formatPrice(shown.low, market)} · Cie {formatPrice(shown.close, market)} (
@@ -455,8 +428,17 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
           </span>
         )}
       </div>
-      {indLegend.length > 0 && (
+      {(indLegend.length > 0 || showVP || showBook || showHeat) && (
         <div className="ind-legend">
+          {/* Herramientas de mercado: nombre y estado (o por qué no aplican a este símbolo) */}
+          {showVP && <span className="muted">Perfil de volumen{hasVolume ? ` ${vpInst.params.rows} · ${vpInst.params.va}%` : ' (sin volumen)'}</span>}
+          {showBook && <span className="muted">Libro de órdenes{isBinance(symbol) ? '' : ' (solo cripto)'}</span>}
+          {showHeat && (
+            <span className="muted">
+              Mapa de calor
+              {!isBinance(symbol) ? ' (solo cripto)' : heatSince ? ` · desde ${F.time.format(toDate(heatSince))}` : ' · grabando…'}
+            </span>
+          )}
           {indLegend.map((ind) => (
             <span key={ind.uid}>
               <span style={{ color: ind.color }}>{ind.label}</span>{' '}

@@ -9,7 +9,7 @@ import Toasts from './components/Toasts';
 import { useAlertEngine } from './alerts/useAlertEngine';
 import { blinkTitle, playChime, systemNotification } from './alerts/notify';
 import { formatPrice, priceDecimals } from './format';
-import { defaultIndicators, INDICATORS } from './indicators/catalog';
+import { defaultIndicators, INDICATORS, newInstance } from './indicators/catalog';
 import { TIMEFRAMES } from './api/binance';
 import { pairLabel, parseId, tabOf } from './api/market';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -58,6 +58,26 @@ export default function App() {
 
   const symbol = normalize(savedSymbol);
   const lists = useMemo(() => ({ ...DEFAULT_LISTS, ...savedLists }), [savedLists]);
+
+  // Una sola vez: el perfil de volumen, el libro y el mapa de calor antes eran botones (prendidos por
+  // defecto). Ahora son indicadores: si estaban prendidos, se suman a la lista para no perderlos.
+  useEffect(() => {
+    let old;
+    try {
+      if (localStorage.getItem('mt.added.marketInds')) return;
+      localStorage.setItem('mt.added.marketInds', '1');
+      old = { vprofile: localStorage.getItem('mt.vprofile'), orderbook: localStorage.getItem('mt.orderbook'), heatmap: localStorage.getItem('mt.heatmap') };
+    } catch {
+      return;
+    }
+    setIndicators((list) => {
+      let next = list;
+      for (const [type, saved] of Object.entries(old)) {
+        if (saved !== 'false' && !next.some((i) => i.type === type)) next = [...next, newInstance(type, next)];
+      }
+      return next;
+    });
+  }, [setIndicators]);
 
   // Una sola vez: suma el perpetuo de BTC a la lista de cripto ya guardada, al lado de BTC.
   useEffect(() => {

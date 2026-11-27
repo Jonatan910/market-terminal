@@ -25,7 +25,7 @@ export function createIndicatorLayer(chart) {
     let pane = 0;
     for (const inst of instances) {
       const def = INDICATORS[inst.type];
-      if (!def) continue;
+      if (!def || def.special) continue; // perfil de volumen, libro y mapa de calor se dibujan aparte
       const paneIndex = def.pane === 'overlay' ? 0 : ++pane;
       const series = {};
       for (const out of def.outputs) {
