@@ -33,9 +33,11 @@ export function connectOrderBook(ticker, onChange, venue = 'spot', onStatus = ()
       // Si Binance bloqueó por exceso de pedidos ("banned until <hora>"), se espera hasta esa hora;
       // si no, cada vez un poco más (5 s, 10 s, 20 s… hasta 5 min) para no empeorar el bloqueo.
       failures++;
+      status.retryAt = null;
       const until = Number(/banned until (\d+)/.exec(e.message)?.[1]);
       const wait = until > Date.now() ? until - Date.now() + 5000 : Math.min(300000, 5000 * 2 ** (failures - 1));
       status.retryAt = Date.now() + wait;
+      onStatus(status);
       if (!closed) setTimeout(() => ((loading = false), resync()), wait);
       return;
     }

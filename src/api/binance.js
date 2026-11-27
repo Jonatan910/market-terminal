@@ -110,7 +110,11 @@ export async function fetchUsdtSymbols(venue = 'spot') {
 // (Binance a veces cambia qué datos sirve cada dirección). `onUrl` avisa cuál se está usando.
 // Devuelve una función para cerrarlo.
 export function openStream(streams, onMessage, venue = 'spot', { silenceMs = 30000, onUrl } = {}) {
-  const urls = VENUES[venue].ws;
+  let urls = VENUES[venue].ws;
+  // Futuros: el libro anda en /stream; las operaciones, velas y precios, en /market (comprobado).
+  if (venue === 'futures' && !streams.every((s) => /@depth|@bookTicker/.test(s))) {
+    urls = ['wss://fstream.binance.com/market/stream', ...urls.filter((u) => !u.includes('/market/'))];
+  }
   let ws;
   let closed = false;
   let retry = 0;
