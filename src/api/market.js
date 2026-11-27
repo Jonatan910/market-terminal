@@ -76,7 +76,7 @@ export function subscribeCandles(id, interval, onCandle) {
   const { market, ticker } = parseId(id);
   if (market === 'crypto') {
     return openStream([`${ticker.toLowerCase()}@kline_${interval}`], ({ k }) =>
-      onCandle(toCandle([k.t, k.o, k.h, k.l, k.c, k.v])),
+      onCandle(toCandle([k.t, k.o, k.h, k.l, k.c, k.v, k.T, k.q, k.n, k.V])), // k.V = compras de takers
     );
   }
   // Acciones y forex: cada 15 s pedimos las velas otra vez y pasamos las 2 últimas

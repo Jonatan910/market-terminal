@@ -34,6 +34,8 @@ export async function fetchKlines(symbol, interval, { limit = KLINES_LIMIT, befo
   return rows.map(toCandle);
 }
 
+// Fila de Binance: [apertura, open, high, low, close, volumen, cierre, volumen en USDT,
+//                   cantidad de operaciones, volumen comprado por "takers", ...]
 export function toCandle(k) {
   return {
     time: Math.floor(k[0] / 1000), // lightweight-charts usa segundos
@@ -42,8 +44,13 @@ export function toCandle(k) {
     low: +k[3],
     close: +k[4],
     volume: +k[5],
+    // Volumen de las compras "agresivas" (a precio de mercado): sirve para el CVD.
+    buyVolume: k[9] != null ? +k[9] : undefined,
   };
 }
+
+// Libro de órdenes: foto completa (hasta 5000 precios de cada lado).
+export const fetchDepth = (symbol, limit = 5000) => getJson(`/api/v3/depth?symbol=${symbol}&limit=${limit}`);
 
 // Precio y variación de 24 h de varios símbolos en una sola llamada.
 export async function fetch24h(symbols) {

@@ -4,7 +4,7 @@
 //  pane: 'overlay'  -> se dibuja encima del precio
 //        'separate' -> se dibuja en su propio panel debajo del gráfico
 //  outputs: cada línea/histograma que dibuja. `color: 'main'` usa el color elegido por el usuario.
-import { sma, ema, bollinger, rsi, macd } from './calc';
+import { sma, ema, bollinger, rsi, macd, cvd, volumeDelta } from './calc';
 
 const closes = (bars) => bars.map((b) => b.close);
 
@@ -67,6 +67,26 @@ export const INDICATORS = {
     levels: [0],
     compute: (bars, p) => macd(closes(bars), p.fast, p.slow, p.signal),
   },
+  cvd: {
+    name: 'CVD (delta de volumen acumulado)',
+    short: 'CVD',
+    pane: 'separate',
+    params: [],
+    onlyCrypto: true,
+    outputs: [{ key: 'value', label: 'CVD', type: 'line', color: 'main', width: 2 }],
+    levels: [0],
+    compute: (bars) => ({ value: cvd(bars) }),
+  },
+  delta: {
+    name: 'Delta de volumen (compras − ventas)',
+    short: 'Delta',
+    pane: 'separate',
+    params: [],
+    onlyCrypto: true,
+    outputs: [{ key: 'value', label: 'Delta', type: 'histogram' }],
+    levels: [0],
+    compute: (bars) => ({ value: volumeDelta(bars) }),
+  },
 };
 
 // Colores que se van asignando a cada indicador nuevo.
@@ -87,7 +107,7 @@ export function newInstance(type, existing = []) {
 // "EMA 20", "BB 20 2", "MACD 12 26 9"
 export function instanceLabel(inst) {
   const def = INDICATORS[inst.type];
-  return `${def.short} ${def.params.map((p) => inst.params[p.key]).join(' ')}`;
+  return `${def.short} ${def.params.map((p) => inst.params[p.key]).join(' ')}`.trim();
 }
 
 // Indicadores con los que arranca la app la primera vez.

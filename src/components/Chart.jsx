@@ -5,6 +5,8 @@ import { KLINES_LIMIT } from '../api/binance';
 import { formatPrice, priceDecimals } from '../format';
 import { createIndicatorLayer } from '../indicators/layer';
 import { createDrawingController } from '../drawings/controller';
+import { createDepthPrimitive } from '../orderbook/depthPrimitive';
+import { connectOrderBook } from '../orderbook/live';
 import DrawingToolbar from './DrawingToolbar';
 import DrawingEditBar from './DrawingEditBar';
 import FavoritesBar from './FavoritesBar';
@@ -84,6 +86,8 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
   // En el celular arranca oculta (tapa mucho gráfico); se muestra con la ★ de la barra izquierda.
   const [favBar, setFavBar] = useLocalStorage('mt.favBar', () => window.innerWidth > 760);
   const [favPos, setFavPos] = useLocalStorage('mt.favPos', null);
+  const [showBook, setShowBook] = useLocalStorage('mt.orderbook', true); // libro de órdenes a la derecha
+  const depthRef = useRef(null);
   const toggleFavorite = (id) => setFavorites((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
   // Herramientas nuevas: se suman una sola vez a los favoritos ya guardados (al lado de su vecina).
   useEffect(() => {
@@ -148,6 +152,7 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     candlesRef.current.priceScale().applyOptions({ scaleMargins: { top: 0.08, bottom: 0.25 } });
 
     layerRef.current = createIndicatorLayer(chart);
+    depthRef.current = createDepthPrimitive(candlesRef.current);
     drawRef.current = createDrawingController({
       chart,
       series: candlesRef.current,
@@ -180,6 +185,20 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
     layerRef.current.setInstances(indicators);
     setIndLegend(layerRef.current.legend(null));
   }, [indicators]);
+
+  // Libro de órdenes en vivo (solo cripto, Binance).
+  useEffect(() => {
+    const depth = depthRef.current;
+    if (market !== 'crypto' || !showBook) {
+      depth.setBook(null);
+      return;
+    }
+    const close = connectOrderBook(parseId(symbol).ticker, (book) => depth.setBook(book));
+    return () => {
+      close();
+      depth.setBook(null);
+    };
+  }, [symbol, market, showBook]);
 
   // Alertas del símbolo: línea naranja punteada con 🔔 en el precio de cada una.
   useEffect(() => {
@@ -349,6 +368,16 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
           {MARKET_LABEL[market]} · {sourceLabel(symbol, meta.exchange)}
         </span>
         <span className="muted">{interval}</span>
+        {market === 'crypto' && (
+          <button
+            className={`chip ${showBook ? 'on' : ''}`}
+            onClick={() => setShowBook(!showBook)}
+            aria-pressed={showBook}
+            title="Libro de órdenes de Binance en vivo, a la derecha del gráfico (verde: compras esperando, rojo: ventas)"
+          >
+            Libro de órdenes
+          </button>
+        )}
         {shown && (
           <span className={change >= 0 ? 'up' : 'down'}>
             Ap {formatPrice(shown.open, market)} · Máx {formatPrice(shown.high, market)} · Mín {formatPrice(shown.low, market)} · Cie {formatPrice(shown.close, market)} (

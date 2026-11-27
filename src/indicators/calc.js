@@ -84,3 +84,17 @@ export function macd(values, fast = 12, slow = 26, signal = 9) {
   const hist = line.map((v, i) => (v != null && sig[i] != null ? v - sig[i] : null));
   return { line, signal: sig, hist };
 }
+
+// Delta de volumen por vela: compras agresivas − ventas agresivas.
+// (Binance da cuánto del volumen fue comprado a mercado; el resto fue vendido a mercado.)
+// Devuelve null en las velas sin ese dato (acciones y forex).
+export function volumeDelta(bars) {
+  return bars.map((b) => (b.buyVolume == null ? null : 2 * b.buyVolume - b.volume));
+}
+
+// CVD (Cumulative Volume Delta): suma acumulada del delta. Si sube, dominan los compradores;
+// si baja, los vendedores. Arranca en 0 en la primera vela cargada.
+export function cvd(bars) {
+  let sum = 0;
+  return volumeDelta(bars).map((d) => (d == null ? null : (sum += d)));
+}

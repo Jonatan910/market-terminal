@@ -19,7 +19,11 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 - Temporalidades: 1m, 5m, 15m, 1h, 4h, 1D y 1S.
 - Lista de seguimiento con pestañas **Cripto / Acciones / Forex**: par, fuente de datos (Binance, Nasdaq, NYSE…),
   precio con los decimales de cada mercado, variación y aviso de mercado cerrado.
-- Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI y MACD en paneles propios.
+- **Libro de órdenes en vivo** (cripto, Binance) a la derecha del gráfico: compras en verde, ventas en rojo,
+  con la "pared" más grande de cada lado marcada. Se arma con la foto de 5000 precios por lado y los
+  cambios en vivo cada 100 ms (como recomienda Binance). Se prende/apaga con el botón "Libro de órdenes".
+- Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI, MACD, **CVD** y
+  **Delta de volumen** (compras − ventas agresivas, solo cripto) en paneles propios.
   Se pueden agregar varias veces (por ejemplo EMA 20 y EMA 50), cambiar sus valores y su color.
 - 24 herramientas de dibujo, agrupadas en menús:
   - **Líneas:** tendencia, rayo, línea extendida, flecha, horizontal, rayo horizontal, vertical y cruz.
@@ -113,7 +117,10 @@ src/
   drawings/tools.js        cada herramienta: cómo se dibuja y cómo se selecciona
   drawings/controller.js   mouse/dedo: crear, seleccionar, mover y borrar dibujos
   drawings/timeMap.js      convierte fecha <-> posición de vela (con pruebas)
-  indicators/calc.js       cálculos (SMA, EMA, Bollinger, RSI, MACD)
+  indicators/calc.js       cálculos (SMA, EMA, Bollinger, RSI, MACD, CVD, delta)
+  orderbook/book.js        libro de órdenes local: foto + cambios (con pruebas)
+  orderbook/live.js        conexión en vivo con Binance y resincronización
+  orderbook/depthPrimitive.js dibujo del libro a la derecha del gráfico
   indicators/calc.test.js  pruebas de los cálculos (npm test)
   indicators/catalog.js    lista de indicadores: parámetros y cómo se dibujan
   indicators/layer.js      dibuja los indicadores sobre el gráfico
@@ -124,6 +131,7 @@ src/
 
 ## Próximos pasos
 
+- Mapa de calor de liquidez (historia del libro de órdenes) y perfil de volumen.
 - Más indicadores: VWAP, Estocástico, ATR, Ichimoku.
 - Alertas que avisen con la página cerrada (servidor + Telegram).
 - Más herramientas de dibujo: abanico de Gann, zonas de tiempo de Fibonacci.

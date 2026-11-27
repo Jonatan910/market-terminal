@@ -1,7 +1,7 @@
 // Pruebas de los cálculos. Se corren con:  npm test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { sma, ema, bollinger, rsi, macd } from './calc.js';
+import { sma, ema, bollinger, rsi, macd, volumeDelta, cvd } from './calc.js';
 
 const close = (a, b, eps = 1e-6) => assert.ok(Math.abs(a - b) < eps, `${a} ≈ ${b}`);
 
@@ -55,4 +55,14 @@ test('MACD: histograma = línea − señal', () => {
   assert.equal(line[24], null); // la EMA lenta (26) todavía no existe
   assert.notEqual(line[25], null);
   assert.notEqual(signal[33], null); // 26 + 9 − 2
+});
+
+test('Delta y CVD: compras − ventas, acumulado', () => {
+  const bars = [{ volume: 10, buyVolume: 7 }, { volume: 5, buyVolume: 1 }, { volume: 4, buyVolume: 2 }];
+  assert.deepEqual(volumeDelta(bars), [4, -3, 0]);
+  assert.deepEqual(cvd(bars), [4, 1, 1]);
+});
+
+test('CVD: sin dato de compras (acciones/forex) da null', () => {
+  assert.deepEqual(cvd([{ volume: 10 }]), [null]);
 });

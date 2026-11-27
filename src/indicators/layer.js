@@ -49,7 +49,7 @@ export function createIndicatorLayer(chart) {
               );
       }
       // Líneas de referencia (70/30 en RSI, 0 en MACD).
-      const firstLine = series[def.outputs.find((o) => o.type === 'line').key];
+      const firstLine = series[(def.outputs.find((o) => o.type === 'line') || def.outputs[0]).key];
       for (const level of def.levels || []) {
         firstLine.createPriceLine({ price: level, color: '#5d6678', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false });
       }
@@ -112,11 +112,12 @@ export function createIndicatorLayer(chart) {
     legend(seriesData) {
       return entries.map(({ inst, def, series, data }) => ({
         uid: inst.uid,
-        label: instanceLabel(inst),
+        label: instanceLabel(inst) + (def.onlyCrypto && bars.length && bars.at(-1).buyVolume == null ? ' (solo cripto)' : ''),
         overlay: def.pane === 'overlay',
         color: inst.color,
+        // Se muestran las líneas; si el indicador solo tiene barras (Delta), las barras.
         values: def.outputs
-          .filter((o) => o.type === 'line')
+          .filter((o) => o.type === 'line' || !def.outputs.some((x) => x.type === 'line'))
           .map((o) => {
             const v = seriesData ? seriesData.get(series[o.key])?.value : lastValue(data[o.key]);
             return { label: o.label, value: v, color: o.color === 'main' ? inst.color : o.color };
