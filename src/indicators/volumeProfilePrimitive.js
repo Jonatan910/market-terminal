@@ -22,8 +22,9 @@ export function createVolumeProfilePrimitive(chart, series) {
   let options = { rows: 60, valueArea: 0.7 };
 
   // Recalcula con las velas que se ven (con un pequeño retraso para no hacerlo en cada píxel de arrastre).
+  let disposed = false;
   function schedule(delay = 80) {
-    if (!visible || timer) return;
+    if (disposed || !visible || timer) return;
     timer = setTimeout(() => {
       timer = null;
       const r = chart.timeScale().getVisibleLogicalRange();
@@ -139,6 +140,10 @@ export function createVolumeProfilePrimitive(chart, series) {
     setBars(list, { live = false } = {}) {
       bars = list;
       schedule(live ? 1000 : 0);
+    },
+    destroy() {
+      disposed = true;
+      clearTimeout(timer);
     },
     setOptions(o) {
       if (o.rows === options.rows && o.valueArea === options.valueArea) return;

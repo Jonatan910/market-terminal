@@ -4,6 +4,7 @@ import Watchlist from './components/Watchlist';
 import SymbolSearch from './components/SymbolSearch';
 import IndicatorsPanel from './components/IndicatorsPanel';
 import UpdateBanner from './components/UpdateBanner';
+import LiquidityView from './components/LiquidityView';
 import AlertsPanel, { alertText } from './components/AlertsPanel';
 import Toasts from './components/Toasts';
 import { useAlertEngine } from './alerts/useAlertEngine';
@@ -49,6 +50,7 @@ export default function App() {
   const [interval, setTimeframe] = useLocalStorage('mt.interval', '4h');
   const [savedLists, setLists] = useLocalStorage('mt.watchlists', initialLists);
   const [tab, setTab] = useLocalStorage('mt.tab', 'crypto');
+  const [view, setView] = useLocalStorage('mt.view', 'candles'); // 'candles' (velas) o 'liquidity' (modo liquidez)
   const [savedIndicators, setIndicators] = useLocalStorage('mt.indicators', defaultIndicators);
   const [allDrawings, setAllDrawings] = useLocalStorage('mt.drawings', {}); // { 'crypto:BTCUSDT': [dibujos] }
   const [alerts, setAlerts] = useLocalStorage('mt.alerts', []); // alertas de precio
@@ -180,6 +182,21 @@ export default function App() {
           Market Terminal
         </div>
         <SymbolSearch onPick={pick} />
+        <div className="view-switch" role="tablist" aria-label="Vista">
+          <button role="tab" aria-selected={view === 'candles'} className={view === 'candles' ? 'active' : ''} onClick={() => setView('candles')}>
+            Velas
+          </button>
+          <button
+            role="tab"
+            aria-selected={view === 'liquidity'}
+            className={view === 'liquidity' ? 'active' : ''}
+            onClick={() => setView('liquidity')}
+            title="Modo liquidez: libro de órdenes segundo a segundo, línea de precio y burbujas de operaciones (cripto)"
+          >
+            Liquidez
+          </button>
+        </div>
+        {view === 'candles' && (
         <nav className="timeframes" aria-label="Temporalidad">
           {TIMEFRAMES.map((tf) => (
             <button key={tf.value} className={tf.value === interval ? 'active' : ''} onClick={() => setTimeframe(tf.value)}>
@@ -187,6 +204,7 @@ export default function App() {
             </button>
           ))}
         </nav>
+        )}
         <IndicatorsPanel value={indicators} onChange={setIndicators} />
         <AlertsPanel
           alerts={alerts}
@@ -204,6 +222,9 @@ export default function App() {
 
       <main className="layout">
         <section className="main-chart">
+          {view === 'liquidity' ? (
+            <LiquidityView symbol={symbol} />
+          ) : (
           <Chart
             symbol={symbol}
             interval={interval}
@@ -214,6 +235,7 @@ export default function App() {
             onCreateAlert={(price) => createAlert({ symbol, price }, { fromChart: true })}
             onLastPrice={(p) => (chartPriceRef.current = p)}
           />
+          )}
         </section>
         <aside className="side">
           <h2>Lista de seguimiento</h2>

@@ -17,9 +17,9 @@ export function niceStep(x) {
 
 // Suma las órdenes (compras y ventas juntas) por franja de precio alrededor de `mid`.
 // Devuelve { base, data }: data[i] es la cantidad en la franja (base + i).
-export function bucketizeBook(bids, asks, mid, step) {
-  const lo = Math.floor((mid * (1 - RANGE)) / step);
-  const hi = Math.ceil((mid * (1 + RANGE)) / step);
+export function bucketizeBook(bids, asks, mid, step, range = RANGE) {
+  const lo = Math.floor((mid * (1 - range)) / step);
+  const hi = Math.ceil((mid * (1 + range)) / step);
   const data = new Float32Array(hi - lo + 1);
   for (const side of [bids, asks]) {
     for (const [price, qty] of side) {

@@ -394,3 +394,27 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 .ind-add button:disabled { opacity: .45; cursor: default; }
 .ind-add button:disabled:hover { border-color: var(--border); }
+
+/* ---------- selector de vista (Velas / Liquidez) ---------- */
+.view-switch { display: flex; padding: 2px; border-radius: 7px; border: 1px solid var(--border); }
+.view-switch button { padding: 4px 10px; border-radius: 5px; color: var(--muted); }
+.view-switch button:hover { color: var(--text); }
+.view-switch button.active { color: #fff; background: var(--accent); }
+
+/* ---------- modo liquidez ---------- */
+.liq-view { position: relative; height: 100%; display: flex; flex-direction: column; background: #05070c; }
+.liq-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 16px; font-size: 13px; background: var(--bg); border-bottom: 1px solid var(--border);
+}
+.liq-bar strong { font-size: 15px; }
+.liq-ctl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.liq-ctl input { width: 80px; accent-color: var(--accent); }
+.liq-legend { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.liq-legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 6px; }
+.liq-legend .dot.buy { background: rgba(38, 166, 154, 0.8); }
+.liq-legend .dot.sell { background: rgba(239, 83, 80, 0.8); }
+.liq-live { margin-left: auto; padding: 4px 10px; border-radius: 6px; background: #ef5350; color: #fff; font-weight: 600; font-size: 12px; }
+.liq-canvas { position: relative; flex: 1; min-height: 0; }
+.liq-canvas canvas { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
+.liq-help { padding: 4px 16px; font-size: 11px; background: var(--bg); border-top: 1px solid var(--border); }

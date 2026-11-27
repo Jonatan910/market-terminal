@@ -34,6 +34,10 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
   ventas en rojo, con el **POC** (precio con más volumen) y el **área de valor** (70 % del volumen).
   Se recalcula al desplazar o hacer zoom. Se agrega desde ƒx Indicadores (filas y % del área de valor configurables). En cripto usa el volumen comprado a mercado de Binance;
   en acciones lo estima por dónde cerró cada vela. Forex no tiene volumen.
+- **Modo liquidez** (estilo Bookmap, cripto y perpetuos): botón Velas / Liquidez. Mapa de calor del libro
+  segundo a segundo (una foto cada 0,5 s, franjas finas ±1 %), línea de mejor compra/venta y **burbujas**
+  con las operaciones reales (verde compras a mercado, rojo ventas, tamaño según volumen). Zoom en tiempo
+  y precio, desplazamiento, "En vivo", contraste y filtro de burbujas. Graba los últimos 30 minutos.
 - Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI, MACD, **CVD** y
   **Delta de volumen** (compras − ventas agresivas, solo cripto) en paneles propios.
   Se pueden agregar varias veces (por ejemplo EMA 20 y EMA 50), cambiar sus valores y su color.
@@ -124,6 +128,9 @@ src/
   components/FavoritesBar.jsx barra flotante de herramientas favoritas
   components/AlertsPanel.jsx panel de alertas: crear, pausar, borrar, historial
   components/Toasts.jsx    carteles de aviso
+  components/LiquidityView.jsx modo liquidez: cámara, controles y conexión en vivo
+  liquidity/recorder.js    grabación del libro y de las operaciones cada 0,5 s (con pruebas)
+  liquidity/render.js      dibujo del modo liquidez en canvas
   alerts/conditions.js     cuándo se dispara cada tipo de alerta (con pruebas)
   alerts/useAlertEngine.js vigila los precios de los símbolos con alertas
   alerts/notify.js         sonido, notificación del sistema y título de la pestaña

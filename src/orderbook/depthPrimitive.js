@@ -13,6 +13,7 @@ export function createDepthPrimitive(series) {
   let book = null;
   let requestUpdate = () => {};
   let pending = false;
+  let disposed = false;
 
   // Junta las cantidades por franja de píxeles, solo para los precios visibles.
   function bucketize(side, height) {
@@ -80,13 +81,16 @@ export function createDepthPrimitive(series) {
 
   return {
     // Se llama en cada cambio del libro (10 por segundo): se redibuja como mucho 5 veces por segundo.
+    destroy() {
+      disposed = true;
+    },
     setBook(b) {
       book = b;
-      if (pending) return;
+      if (pending || disposed) return;
       pending = true;
       setTimeout(() => {
         pending = false;
-        requestUpdate();
+        if (!disposed) requestUpdate();
       }, 200);
     },
   };

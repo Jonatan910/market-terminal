@@ -187,10 +187,15 @@ export default function Chart({ symbol, interval, indicators, drawings, onDrawin
 
     chartRef.current = chart;
     return () => {
+      // Al cerrar el gráfico (por ejemplo al pasar al modo liquidez): primero se frenan las partes
+      // que tienen temporizadores, y el gráfico se elimina después de que React termine de limpiar
+      // los demás efectos (que todavía lo usan, por ejemplo para quitar las líneas de alerta).
       drawRef.current.destroy();
+      vpRef.current.destroy();
+      depthRef.current.destroy();
       drawRef.current = null;
       layerRef.current = null;
-      chart.remove();
+      setTimeout(() => chart.remove(), 0);
     };
   }, []);
 
