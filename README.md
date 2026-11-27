@@ -28,6 +28,8 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
 - **Mapa de calor de liquidez** (cripto): cada 2 s se guarda una foto del libro y se dibuja detrás de las
   velas; azul/celeste = poca liquidez, amarillo/naranja = órdenes grandes esperando. Binance no da la
   historia del libro, así que se arma desde que abrís la página (guarda hasta 3 horas por símbolo).
+  Además marca las **paredes de liquidez** (los precios con más órdenes en los últimos 30 s) con líneas
+  a lo ancho de todo el gráfico, y extiende la foto actual a la derecha de la última vela.
 - **Perfil de volumen** (lo visible en pantalla): cuánto se operó en cada precio, compras en verde y
   ventas en rojo, con el **POC** (precio con más volumen) y el **área de valor** (70 % del volumen).
   Se recalcula al desplazar o hacer zoom. Se agrega desde ƒx Indicadores (filas y % del área de valor configurables). En cripto usa el volumen comprado a mercado de Binance;

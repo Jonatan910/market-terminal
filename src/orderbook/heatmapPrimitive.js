@@ -17,6 +17,13 @@ const STOPS = [
 const LUT = buildLut(); // 256 colores RGBA ya calculados
 const MIN_INTENSITY = 0.05; // por debajo no se pinta (deja ver el fondo)
 
+// Paredes de liquidez: los precios con más órdenes (promedio de las últimas fotos) se marcan
+// con una línea horizontal a lo ancho de todo el gráfico.
+const WALL_SAMPLES = 15; // promedio de las últimas 15 fotos (30 s): ignora órdenes que aparecen y desaparecen
+const WALL_ROW = 3; // se agrupan por franjas de 3 px (así se ven igual con cualquier zoom)
+const WALL_MAX = 14; // como mucho 14 paredes a la vista
+const WALL_MIN_RATIO = 0.25; // y solo las que tienen al menos el 25 % de la referencia
+
 function buildLut() {
   const lut = new Uint8ClampedArray(256 * 4);
   for (let i = 0; i < 256; i++) {
@@ -36,6 +43,7 @@ export function createHeatmapPrimitive(chart, series) {
   let map = createTimeMap([]);
   let requestUpdate = () => {};
   let cacheKey = '';
+  let walls = []; // [{ y, h, v }] calculadas junto con la imagen
   const off = document.createElement('canvas');
   const offCtx = off.getContext('2d');
 
@@ -52,6 +60,7 @@ export function createHeatmapPrimitive(chart, series) {
   function rebuild(W, H) {
     off.width = W;
     off.height = H;
+    walls = [];
     const cols = recorder.columns;
     const step = recorder.step;
     // Escala de precio lineal: y = a * precio + b (con dos puntos alcanza).
@@ -69,7 +78,8 @@ export function createHeatmapPrimitive(chart, series) {
     for (let i = 0; i < cols.length; i++) {
       const x = xs[i];
       if (x == null) continue;
-      const next = i + 1 < cols.length ? xs[i + 1] : x + 3;
+      // La foto más reciente se extiende hasta el borde derecho (el espacio a la derecha de la última vela).
+      const next = i + 1 < cols.length ? xs[i + 1] : W;
       const xa = Math.max(0, Math.floor(x));
       const xb = Math.min(W, Math.max(xa + 1, Math.floor(next ?? x + 1)));
       if (xb <= 0 || xa >= W) continue;
@@ -116,6 +126,28 @@ export function createHeatmapPrimitive(chart, series) {
       }
     }
     offCtx.putImageData(img, 0, 0);
+    walls = findWalls(cols, step, a, b, H);
+  }
+
+  // Promedia las últimas fotos por precio, las agrupa por franjas de pantalla y se queda con las más grandes.
+  function findWalls(cols, step, a, b, H) {
+    const recent = cols.slice(-WALL_SAMPLES);
+    const byPrice = new Map();
+    for (const { base, data } of recent) {
+      for (let j = 0; j < data.length; j++) if (data[j]) byPrice.set(base + j, (byPrice.get(base + j) || 0) + data[j] / recent.length);
+    }
+    const rows = new Map();
+    for (const [idx, q] of byPrice) {
+      const y = a * idx * step + b;
+      if (y < 0 || y > H) continue;
+      const r = Math.floor(y / WALL_ROW);
+      rows.set(r, (rows.get(r) || 0) + q);
+    }
+    const top = [...rows].sort((u, v) => v[1] - u[1]).slice(0, WALL_MAX);
+    if (!top.length) return [];
+    // Referencia: la 3.ª más grande (no la mayor), así una sola pared gigante no esconde a las demás.
+    const ref = top[Math.min(2, top.length - 1)][1];
+    return top.filter(([, q]) => q >= ref * WALL_MIN_RATIO).map(([r, q]) => ({ y: r * WALL_ROW, v: Math.min(1, q / ref), q }));
   }
 
   function draw(ctx, { width, height }) {
@@ -131,6 +163,13 @@ export function createHeatmapPrimitive(chart, series) {
       rebuild(W, H);
     }
     if (off.width && off.height) ctx.drawImage(off, 0, 0, W, H);
+    // Paredes de liquidez a lo ancho: más gruesas y más "calientes" cuanto más grandes.
+    for (const { y, v } of walls) {
+      const c = Math.round((0.45 + 0.55 * v) * 255) * 4; // siempre de celeste para arriba
+      const h = v > 0.75 ? 3 : v > 0.45 ? 2 : 1.5;
+      ctx.fillStyle = `rgba(${LUT[c]}, ${LUT[c + 1]}, ${LUT[c + 2]}, ${0.35 + 0.45 * v})`;
+      ctx.fillRect(0, y + (WALL_ROW - h) / 2, W, h);
+    }
   }
 
   series.attachPrimitive({
