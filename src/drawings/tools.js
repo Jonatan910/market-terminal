@@ -275,7 +275,6 @@ export const TOOLS = {
     points: 1,
     draw(ctx, d, [a], env) {
       line(ctx, { x: 0, y: a.y }, { x: env.width, y: a.y });
-      label(ctx, env.formatPrice(d.points[0].price), env.width - 2, a.y, d.style.color, 'right');
     },
     hit: (d, [a], x, y) => Math.abs(y - a.y) < TOL,
   },
@@ -285,7 +284,6 @@ export const TOOLS = {
     points: 1,
     draw(ctx, d, [a], env) {
       line(ctx, a, { x: env.width, y: a.y });
-      label(ctx, env.formatPrice(d.points[0].price), env.width - 2, a.y, d.style.color, 'right');
     },
     hit: (d, [a], x, y) => x >= a.x - TOL && Math.abs(y - a.y) < TOL,
   },
@@ -305,7 +303,6 @@ export const TOOLS = {
     draw(ctx, d, [a], env) {
       line(ctx, { x: 0, y: a.y }, { x: env.width, y: a.y });
       line(ctx, { x: a.x, y: 0 }, { x: a.x, y: env.height });
-      label(ctx, env.formatPrice(d.points[0].price), env.width - 2, a.y, d.style.color, 'right');
     },
     hit: (d, [a], x, y) => Math.abs(y - a.y) < TOL || Math.abs(x - a.x) < TOL,
   },

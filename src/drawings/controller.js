@@ -143,10 +143,62 @@ export function createDrawingController({ chart, series, container, onChange, on
     }
   }
 
+  // ---------- etiquetas en los ejes (como en otras plataformas) ----------
+  // Precio en el eje de la derecha y fecha en el de abajo, del color del dibujo:
+  //   - siempre: líneas y rayos horizontales, cruz (precio) y líneas verticales, cruz (fecha);
+  //   - el dibujo seleccionado (o el que se está creando): todas sus puntas.
+  const ALWAYS_PRICE = new Set(['hline', 'hray', 'crossline']);
+  const ALWAYS_TIME = new Set(['vline', 'crossline']);
+  const dateFmt = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+  let priceViews = [];
+  let timeViews = [];
+
+  function textOn(hex) {
+    const n = parseInt(String(hex).replace('#', '').slice(0, 6), 16);
+    const lum = 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+    return lum > 160 ? '#000' : '#fff'; // texto negro sobre colores claros (amarillo, blanco)
+  }
+  const axisView = (coord, text, color) => ({
+    coordinate: () => coord,
+    text: () => text,
+    textColor: () => textOn(color),
+    backColor: () => color,
+    visible: () => true,
+    tickVisible: () => true,
+  });
+
+  function updateAxisViews() {
+    priceViews = [];
+    timeViews = [];
+    if (hidden) return;
+    const list = draft ? [...drawings, draft] : drawings;
+    for (const d of list) {
+      if (!TOOLS[d.type]) continue;
+      const active = d.id === selectedId || d === draft;
+      const color = d.style.color;
+      const pts = active ? handlesOf(d) : [];
+      const prices = new Set(pts.map((p) => p.price));
+      const times = new Set(pts.map((p) => p.time));
+      if (ALWAYS_PRICE.has(d.type)) prices.add(d.points[0].price);
+      if (ALWAYS_TIME.has(d.type)) times.add(d.points[0].time);
+      if (d.type === 'text') prices.clear(), times.clear(); // el texto no necesita etiquetas
+      for (const price of prices) {
+        const y = series.priceToCoordinate(price);
+        if (y != null) priceViews.push(axisView(y, formatPrice(price, market), color));
+      }
+      for (const time of times) {
+        const p = project({ time, price: d.points[0].price });
+        if (p) timeViews.push(axisView(p.x, dateFmt.format(new Date(time * 1000)), color));
+      }
+    }
+  }
+
   const primitive = {
     attached: (p) => (requestUpdate = p.requestUpdate),
     detached: () => (requestUpdate = () => {}),
-    updateAllViews: () => {},
+    updateAllViews: updateAxisViews,
+    priceAxisViews: () => priceViews,
+    timeAxisViews: () => timeViews,
     paneViews: () => [
       {
         zOrder: () => 'top',

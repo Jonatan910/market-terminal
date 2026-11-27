@@ -50,6 +50,8 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
   - **Texto.**
 - Editar el dibujo seleccionado: color, grosor, tipo de línea, **opacidad de línea y de relleno**, **extender a izquierda/derecha**
   (un rectángulo con las dos cruza todo el gráfico), texto, **duplicar** y borrar.
+- **Etiquetas en los ejes:** las líneas/rayos horizontales y la cruz muestran su precio en el eje de precios
+  (y la vertical/cruz su fecha abajo); el dibujo seleccionado muestra el precio y la fecha de cada punta.
 - **Copiar y pegar** con Ctrl+C / Ctrl+V (también entre símbolos) y **Alt + arrastrar** para duplicar.
 - **Barra de favoritos** flotante y movible: se arma con la ☆ de cada herramienta en los menús.
 - **Imán**: pega los puntos al máximo, mínimo, apertura o cierre de la vela. Se activa con el botón
