@@ -418,3 +418,27 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .liq-canvas { position: relative; flex: 1; min-height: 0; }
 .liq-canvas canvas { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
 .liq-help { padding: 4px 16px; font-size: 11px; background: var(--bg); border-top: 1px solid var(--border); }
+
+/* ---------- detector de órdenes grandes ---------- */
+.liq-num {
+  width: 74px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); font: inherit; font-size: 12px;
+}
+.liq-num::placeholder { color: #6b7385; }
+.big-list {
+  position: absolute; left: 8px; top: 8px; z-index: 3; width: 300px; max-width: calc(100% - 100px);
+  max-height: 55%; overflow-y: auto; border-radius: 8px;
+  background: rgba(11, 14, 20, 0.88); border: 1px solid var(--border); box-shadow: 0 8px 24px #0008;
+}
+.big-head { padding: 6px 10px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: #f5c518; border-bottom: 1px solid var(--border); }
+.big-empty { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+.big-row { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; width: 100%; padding: 6px 10px; text-align: left; font-size: 12px; border-bottom: 1px solid #1a2030; }
+.big-row:hover { background: var(--panel-2); }
+.big-time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.big-title { font-weight: 600; }
+.big-price { grid-column: 2; color: var(--muted); font-size: 11px; }
+.big-row.up .big-title { color: #3ddc97; }
+.big-row.down .big-title { color: #ff5a5f; }
+.big-row.wall .big-title { color: #f5c518; }
+.big-row.pulled .big-title { color: #c0c6d2; }
+@media (max-width: 760px) { .big-list { width: auto; right: 90px; max-height: 40%; } }

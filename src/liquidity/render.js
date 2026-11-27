@@ -202,9 +202,66 @@ export function render(ctx, { w, h }, rec, view, opts) {
     ctx.lineWidth = 1;
     ctx.strokeStyle = buy ? 'rgba(120, 230, 210, 0.9)' : 'rgba(255, 150, 140, 0.9)';
     ctx.stroke();
-    if (r >= 14) {
+    if (b.big && opts.showBig) {
+      // Operación grande: aro dorado y su tamaño, aunque la burbuja sea chica en pantalla.
+      ctx.beginPath();
+      ctx.arc(x, y, r + 3, 0, Math.PI * 2);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#f5c518';
+      ctx.stroke();
+      ctx.fillStyle = '#f5c518';
+      ctx.fillText(compact.format(b.qty), x, y - r - 9);
+    } else if (r >= 14) {
       ctx.fillStyle = '#fff';
       ctx.fillText(compact.format(b.qty), x, y);
+    }
+  }
+  // ---------- órdenes grandes: paredes activas y paredes que desaparecieron ----------
+  const det = opts.showBig ? opts.detector : null;
+  if (det) {
+    ctx.font = '600 10px system-ui, sans-serif';
+    for (const w of det.walls.values()) {
+      if (!w.confirmed) continue; // solo las que duraron al menos 3 s
+      const x0 = Math.max(0, tToX(w.since));
+      const ya = pToY(w.price + step / 2);
+      const yb = pToY(w.price - step / 2);
+      if (yb < 0 || ya > ph || x0 > pw) continue;
+      const hgt = Math.max(3, yb - ya);
+      ctx.strokeStyle = '#f5c518';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x0, ya - (hgt - (yb - ya)) / 2, pw - x0, hgt);
+      ctx.fillStyle = '#f5c518';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${compact.format(w.qty)}`, pw - 4, ya - 6);
+    }
+    ctx.textAlign = 'center';
+    for (const e of det.events) {
+      if (e.t < left) break; // los eventos están de más nuevo a más viejo
+      if (e.type !== 'wall-pulled' && e.type !== 'wall-filled') continue;
+      const x = tToX(e.t);
+      const y = pToY(e.price);
+      if (y < 0 || y > ph) continue;
+      if (e.type === 'wall-pulled') {
+        // Retirada: ✕ gris
+        ctx.strokeStyle = '#c0c6d2';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x - 5, y - 5);
+        ctx.lineTo(x + 5, y + 5);
+        ctx.moveTo(x + 5, y - 5);
+        ctx.lineTo(x - 5, y + 5);
+        ctx.stroke();
+      } else {
+        // Ejecutada: ◆ dorado
+        ctx.fillStyle = '#f5c518';
+        ctx.beginPath();
+        ctx.moveTo(x, y - 6);
+        ctx.lineTo(x + 6, y);
+        ctx.lineTo(x, y + 6);
+        ctx.lineTo(x - 6, y);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
   }
   ctx.restore();

@@ -4,11 +4,25 @@ import { isBinance, pairLabel, parseId, venueOf } from '../api/market';
 import { connectOrderBook } from '../orderbook/live';
 import { getLiqRecorder, LIQ_SAMPLE_MS } from '../liquidity/recorder';
 import { render, AXIS_W, AXIS_H } from '../liquidity/render';
+import { getDetector } from '../liquidity/detector';
+import { playChime, systemNotification, unlockAudio, askNotificationPermission } from '../alerts/notify';
 import { formatPrice } from '../format';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const FPS_MS = 66; // se redibuja unas 15 veces por segundo
 const timeFmt = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+const compact = new Intl.NumberFormat('es-AR', { notation: 'compact', maximumFractionDigits: 1 });
+const NEAR = 0.003; // "cerca del precio": dentro del 0,3 %
+
+// Texto de un evento del detector.
+function eventText(e, base) {
+  const qty = `${compact.format(e.qty)} ${base}`;
+  const lado = e.side === 'buy' || e.side === 'bid' ? 'compra' : 'venta';
+  if (e.type === 'trade') return { title: `${e.side === 'buy' ? 'Compra' : 'Venta'} a mercado ${qty}`, kind: e.side === 'buy' ? 'up' : 'down' };
+  if (e.type === 'wall-new') return { title: `Pared de ${lado} nueva: ${qty}`, kind: 'wall' };
+  if (e.type === 'wall-filled') return { title: `Pared de ${lado} ejecutada: ${qty}`, kind: 'wall' };
+  return { title: `Pared de ${lado} retirada: ${qty}`, kind: 'pulled' };
+}
 
 // "Modo liquidez" (estilo Bookmap): mapa de calor del libro segundo a segundo, línea de mejor
 // compra/venta y burbujas de operaciones. Solo cripto y perpetuos de Binance.
@@ -23,10 +37,20 @@ export default function LiquidityView({ symbol }) {
   const [minBubble, setMinBubble] = useLocalStorage('mt.liq.minBubble', 0.3);
   const [showDom, setShowDom] = useLocalStorage('mt.liq.dom', true); // panel del libro a la derecha
   const [showBottom, setShowBottom] = useLocalStorage('mt.liq.bottom', true); // panel de CVD y volumen
+  const [showBig, setShowBig] = useLocalStorage('mt.liq.big', true); // detector de órdenes grandes
+  const [notifyBig, setNotifyBig] = useLocalStorage('mt.liq.notify', false); // avisar con sonido/notificación
+  const [thresholds, setThresholds] = useLocalStorage('mt.liq.thresholds', {}); // { símbolo: { trade, wall } } fijados a mano
+  const [events, setEvents] = useState([]);
+  const [autoTh, setAutoTh] = useState({ trade: null, wall: null });
+  const detRef = useRef(null);
+  const settingsRef = useRef({});
+  const th = thresholds[symbol] || {};
+  settingsRef.current = { th, notifyBig, showBig };
+  const base = parseId(symbol).ticker.replace(/USDT$/, '');
   const [live, setLive] = useState(true);
   const [since, setSince] = useState(null);
   const optsRef = useRef({});
-  optsRef.current = { contrast, minBubble, showDom, showBottom, formatPrice: (n) => formatPrice(n, 'crypto') };
+  optsRef.current = { contrast, minBubble, showDom, showBottom, showBig, detector: detRef.current, formatPrice: (n) => formatPrice(n, 'crypto') };
   const supported = isBinance(symbol);
 
   // ---------- datos: libro + operaciones ----------
@@ -39,7 +63,11 @@ export default function LiquidityView({ symbol }) {
     const venue = venueOf(symbol);
     const rec = getLiqRecorder(symbol);
     recRef.current = rec;
+    const det = getDetector(symbol);
+    detRef.current = det;
+    setEvents(det.events.slice(0, 8));
     setSince(rec.since);
+    let lastNotice = 0;
     let latest = null;
     const closeBook = connectOrderBook(ticker, (book) => (latest = book), venue);
     const closeTrades = openStream(
@@ -49,13 +77,31 @@ export default function LiquidityView({ symbol }) {
       venue,
     );
     const timer = setInterval(() => {
-      if (rec.sample(latest)) setSince(rec.since);
+      if (!rec.sample(latest)) return;
+      setSince(rec.since);
+      // Detector de órdenes grandes
+      const { th, notifyBig, showBig } = settingsRef.current;
+      const fresh = det.update(rec, { trade: th.trade ?? null, wall: th.wall ?? null });
+      setAutoTh({ ...det.auto });
+      if (!fresh.length) return;
+      setEvents(det.events.slice(0, 8));
+      // Aviso (sonido + notificación) si es algo grande cerca del precio, como mucho cada 4 s.
+      const col = rec.columns.at(-1);
+      const mid = (col.bid + col.ask) / 2;
+      const near = fresh.filter((e) => (e.type === 'trade' || e.type === 'wall-new') && Math.abs(e.price - mid) / mid <= NEAR);
+      if (showBig && notifyBig && near.length && Date.now() - lastNotice > 4000) {
+        lastNotice = Date.now();
+        playChime();
+        const e = near[0];
+        systemNotification(`🐋 ${pairLabel(symbol)}: ${eventText(e, parseId(symbol).ticker.replace(/USDT$/, '')).title}`, `Precio ${formatPrice(e.price, 'crypto')}`);
+      }
     }, LIQ_SAMPLE_MS);
     return () => {
       closeBook();
       closeTrades();
       clearInterval(timer);
       recRef.current = null;
+      detRef.current = null;
     };
   }, [symbol, supported]);
 
@@ -178,6 +224,22 @@ export default function LiquidityView({ symbol }) {
     };
   }, []);
 
+  // Ir a un evento: la vista se mueve a ese momento y ese precio.
+  function goTo(e) {
+    const view = viewRef.current;
+    view.live = false;
+    view.endTime = Math.min(Date.now(), e.t + 20000);
+    view.followPrice = false;
+    view.priceCenter = e.price;
+    setLive(false);
+  }
+
+  const setTh = (key, value) => {
+    const n = Number(String(value).replace(',', '.'));
+    const next = { ...th, [key]: value === '' || !(n > 0) ? undefined : n };
+    setThresholds({ ...thresholds, [symbol]: next });
+  };
+
   function goLive() {
     const view = viewRef.current;
     view.live = true;
@@ -206,6 +268,49 @@ export default function LiquidityView({ symbol }) {
         <button className={`chip ${showBottom ? 'on' : ''}`} onClick={() => setShowBottom(!showBottom)} aria-pressed={showBottom} title="Panel de abajo: CVD (compras − ventas acumuladas) y volumen por medio segundo">
           CVD y volumen
         </button>
+        <button className={`chip ${showBig ? 'on' : ''}`} onClick={() => setShowBig(!showBig)} aria-pressed={showBig} title="Detector de órdenes grandes: operaciones y paredes fuera de lo común">
+          Órdenes grandes
+        </button>
+        {showBig && (
+          <>
+            <label className="liq-ctl" title="Operaciones a mercado (por medio segundo) de este tamaño o más. Vacío = automático (el 1 % más grande).">
+              Operación ≥
+              <input
+                className="liq-num"
+                inputMode="decimal"
+                value={th.trade ?? ''}
+                placeholder={autoTh.trade != null ? `auto ${compact.format(autoTh.trade)}` : 'auto'}
+                onChange={(e) => setTh('trade', e.target.value)}
+              />
+              {base}
+            </label>
+            <label className="liq-ctl" title="Paredes del libro de este tamaño o más. Vacío = automático (el 1 % más grande).">
+              Pared ≥
+              <input
+                className="liq-num"
+                inputMode="decimal"
+                value={th.wall ?? ''}
+                placeholder={autoTh.wall != null ? `auto ${compact.format(autoTh.wall)}` : 'auto'}
+                onChange={(e) => setTh('wall', e.target.value)}
+              />
+              {base}
+            </label>
+            <label className="liq-ctl" title="Sonido y notificación cuando aparece una operación o pared grande cerca del precio (±0,3 %)">
+              <input
+                type="checkbox"
+                checked={notifyBig}
+                onChange={async (e) => {
+                  setNotifyBig(e.target.checked);
+                  if (e.target.checked) {
+                    unlockAudio();
+                    await askNotificationPermission();
+                  }
+                }}
+              />
+              Avisar
+            </label>
+          </>
+        )}
         <span className="liq-legend">
           <i className="dot buy" /> compras a mercado <i className="dot sell" /> ventas a mercado
         </span>
@@ -217,6 +322,24 @@ export default function LiquidityView({ symbol }) {
       </div>
       <div className="liq-canvas" ref={wrapRef}>
         <canvas ref={canvasRef} />
+        {showBig && supported && (
+          <div className="big-list" aria-label="Órdenes grandes">
+            <div className="big-head">Órdenes grandes</div>
+            {!events.length && <div className="big-empty">Todavía no hubo. Se marcan con aro dorado (operaciones) y recuadro dorado (paredes).</div>}
+            {events.map((e) => {
+              const { title, kind } = eventText(e, base);
+              return (
+                <button key={e.id} className={`big-row ${kind}`} onClick={() => goTo(e)} title="Ver en el mapa">
+                  <span className="big-time">{timeFmt.format(e.t)}</span>
+                  <span className="big-title">{title}</span>
+                  <span className="big-price">
+                    {formatPrice(e.price, 'crypto')} · ${compact.format(e.qty * e.price)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
       <div className="liq-help muted">
         Rueda: zoom en el tiempo · Shift + rueda o rueda sobre los precios: zoom en el precio · Arrastrar: mover · Doble clic: en vivo

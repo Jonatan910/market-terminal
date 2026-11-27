@@ -40,6 +40,11 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
   y precio, desplazamiento, "En vivo", contraste y filtro de burbujas. Graba los últimos 30 minutos.
   A la derecha, el **libro actual** y el **volumen operado por precio**; abajo, **CVD** y **volumen por
   medio segundo** (cada panel se muestra u oculta con su botón).
+  **Detector de órdenes grandes**: operaciones a mercado fuera de lo común (aro dorado) y paredes del libro
+  (recuadro dorado), con eventos de pared **nueva**, **ejecutada** (◆) o **retirada** (✕, posible spoofing).
+  Umbral automático (1 % más grande en operaciones, 0,5 % en paredes) o fijo por símbolo; una pared cuenta
+  si dura al menos 3 s. Lista de eventos (tocar uno lleva a ese momento) y aviso opcional con sonido y
+  notificación cuando pasa algo grande cerca del precio.
 - Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI, MACD, **CVD** y
   **Delta de volumen** (compras − ventas agresivas, solo cripto) en paneles propios.
   Se pueden agregar varias veces (por ejemplo EMA 20 y EMA 50), cambiar sus valores y su color.
@@ -135,6 +140,7 @@ src/
   components/LiquidityView.jsx modo liquidez: cámara, controles y conexión en vivo
   liquidity/recorder.js    grabación del libro y de las operaciones cada 0,5 s (con pruebas)
   liquidity/render.js      dibujo del modo liquidez en canvas
+  liquidity/detector.js    detector de operaciones y paredes grandes (con pruebas)
   alerts/conditions.js     cuándo se dispara cada tipo de alerta (con pruebas)
   alerts/useAlertEngine.js vigila los precios de los símbolos con alertas
   alerts/notify.js         sonido, notificación del sistema y título de la pestaña
