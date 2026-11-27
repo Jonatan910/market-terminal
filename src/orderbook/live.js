@@ -2,7 +2,9 @@
 import { fetchDepth, openStream } from '../api/binance.js';
 import { OrderBook } from './book.js';
 
-export function connectOrderBook(ticker, onChange, venue = 'spot') {
+// onStatus (opcional): recibe { events, snapshots, error } para diagnosticar la conexión.
+export function connectOrderBook(ticker, onChange, venue = 'spot', onStatus = () => {}) {
+  const status = { events: 0, snapshots: 0, gaps: 0, error: null };
   const book = new OrderBook(venue);
   let buffer = []; // cambios que llegan mientras se pide la foto
   let loading = false;
@@ -14,12 +16,17 @@ export function connectOrderBook(ticker, onChange, venue = 'spot') {
     book.lastId = null;
     try {
       const snap = await fetchDepth(ticker, venue);
+      status.snapshots++;
+      status.error = null;
+      onStatus(status);
       if (closed) return;
       book.loadSnapshot(snap);
       for (const ev of buffer) if (book.apply(ev) === 'gap') throw new Error('salto');
       buffer = [];
       onChange(book);
-    } catch {
+    } catch (e) {
+      status.error = e.message;
+      onStatus(status);
       // Se reintenta en unos segundos (por ejemplo, si se perdió la conexión).
       if (!closed) setTimeout(() => ((loading = false), resync()), 3000);
       return;
@@ -31,6 +38,7 @@ export function connectOrderBook(ticker, onChange, venue = 'spot') {
   const close = openStream(
     [`${ticker.toLowerCase()}@depth@100ms`],
     (ev) => {
+    status.events++;
     if (!book.ready) {
       buffer.push(ev);
       if (buffer.length > 500) buffer.shift();
@@ -44,6 +52,7 @@ export function connectOrderBook(ticker, onChange, venue = 'spot') {
     const r = book.apply(ev);
     if (r === 'applied') onChange(book);
     else if (r === 'gap') {
+      status.gaps++;
       buffer = [ev];
       resync();
     }

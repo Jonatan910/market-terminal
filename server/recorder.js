@@ -54,14 +54,15 @@ const recorders = new Map();
 for (const id of SYMBOLS) {
   const [market, ticker] = id.split(':');
   const venue = market === 'perp' ? 'futures' : 'spot';
-  const r = { id, step: null, book: null, columns: [], bubbles: new Map(), lastSample: null, saved: 0, errors: 0 };
+  const r = { id, step: null, book: null, columns: [], bubbles: new Map(), lastSample: null, saved: 0, errors: 0, trades: 0, bookStatus: null };
   recorders.set(id, r);
 
-  connectOrderBook(ticker, (book) => (r.book = book), venue);
+  connectOrderBook(ticker, (book) => (r.book = book), venue, (s) => (r.bookStatus = { ...s }));
   openStream(
     [`${ticker.toLowerCase()}@aggTrade`],
     (t) => {
       // Operaciones agrupadas por segundo y lado: precio promedio ponderado.
+      r.trades++;
       const sec = Math.floor(t.T / 1000) * 1000;
       const side = t.m ? 'sell' : 'buy';
       const key = `${sec}|${side}`;
@@ -199,7 +200,15 @@ http
       if (url.pathname === '/' || url.pathname === '/health') {
         const symbols = {};
         for (const r of recorders.values()) {
-          symbols[r.id] = { libroListo: Boolean(r.book?.ready), ultimaFoto: r.lastSample, minutosGuardados: r.saved, errores: r.errors };
+          symbols[r.id] = {
+            libroListo: Boolean(r.book?.ready),
+            ultimaFoto: r.lastSample,
+            minutosGuardados: r.saved,
+            errores: r.errors,
+            // Diagnóstico: mensajes recibidos y último error del libro de órdenes.
+            operacionesRecibidas: r.trades,
+            libro: r.bookStatus ?? { events: 0, snapshots: 0, gaps: 0, error: 'sin mensajes del libro todavía' },
+          };
         }
         return send(req, res, 200, { ok: true, desde: startedAt, guardado: store.kind, almacenamiento: await store.stats().catch(() => null), symbols });
       }
