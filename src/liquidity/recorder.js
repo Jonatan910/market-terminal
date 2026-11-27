@@ -16,11 +16,14 @@ export function createLiqRecorder() {
   const columns = []; // [{ t: ms, bid, ask, base, data }]
   const bubbles = []; // [{ t: ms (inicio del medio segundo), side: 'buy'|'sell', qty, price }]
   const open = { buy: null, sell: null }; // burbuja que se está armando de cada lado
+  // Volumen operado por precio desde que empezó la grabación: índice de franja -> { buy, sell }.
+  const volAt = new Map();
   let step = null;
 
   return {
     columns,
     bubbles,
+    volAt,
     get step() {
       return step;
     },
@@ -45,6 +48,12 @@ export function createLiqRecorder() {
     trade({ price, qty, time, isSell }) {
       const t = Math.floor(time / LIQ_SAMPLE_MS) * LIQ_SAMPLE_MS;
       const side = isSell ? 'sell' : 'buy';
+      if (step) {
+        const idx = Math.round(price / step);
+        const v = volAt.get(idx) || { buy: 0, sell: 0 };
+        v[side] += qty;
+        volAt.set(idx, v);
+      }
       const b = open[side];
       if (b && b.t === t) {
         b.notional += price * qty;

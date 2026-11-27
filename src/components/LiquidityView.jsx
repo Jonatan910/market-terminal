@@ -21,10 +21,12 @@ export default function LiquidityView({ symbol }) {
   const viewRef = useRef(newView());
   const [contrast, setContrast] = useLocalStorage('mt.liq.contrast', 1);
   const [minBubble, setMinBubble] = useLocalStorage('mt.liq.minBubble', 0.3);
+  const [showDom, setShowDom] = useLocalStorage('mt.liq.dom', true); // panel del libro a la derecha
+  const [showBottom, setShowBottom] = useLocalStorage('mt.liq.bottom', true); // panel de CVD y volumen
   const [live, setLive] = useState(true);
   const [since, setSince] = useState(null);
   const optsRef = useRef({});
-  optsRef.current = { contrast, minBubble, formatPrice: (n) => formatPrice(n, 'crypto') };
+  optsRef.current = { contrast, minBubble, showDom, showBottom, formatPrice: (n) => formatPrice(n, 'crypto') };
   const supported = isBinance(symbol);
 
   // ---------- datos: libro + operaciones ----------
@@ -132,7 +134,9 @@ export default function LiquidityView({ symbol }) {
       if (e.button > 0) return;
       const f = viewRef.current.frame;
       if (!f) return;
-      drag = { ...local(e), right: f.right, center: viewRef.current.priceCenter, f };
+      const p = local(e);
+      // En el panel de abajo (CVD/volumen) solo se mueve el tiempo, no el precio.
+      drag = { ...p, right: f.right, center: viewRef.current.priceCenter, f, timeOnly: p.y > f.ph };
       canvas.setPointerCapture(e.pointerId);
     }
 
@@ -148,7 +152,7 @@ export default function LiquidityView({ symbol }) {
         view.endTime = Math.min(Date.now(), drag.right - dx * drag.f.msPerPx);
         setLive(false);
       }
-      if (Math.abs(dy) > 2) {
+      if (Math.abs(dy) > 2 && !drag.timeOnly) {
         view.followPrice = false;
         view.priceCenter = drag.center + dy * drag.f.ppp;
       }
@@ -196,6 +200,12 @@ export default function LiquidityView({ symbol }) {
           Burbujas
           <input type="range" min="0" max="3" step="0.1" value={minBubble} onChange={(e) => setMinBubble(Number(e.target.value))} />
         </label>
+        <button className={`chip ${showDom ? 'on' : ''}`} onClick={() => setShowDom(!showDom)} aria-pressed={showDom} title="Libro de órdenes actual y volumen operado por precio, a la derecha">
+          Libro
+        </button>
+        <button className={`chip ${showBottom ? 'on' : ''}`} onClick={() => setShowBottom(!showBottom)} aria-pressed={showBottom} title="Panel de abajo: CVD (compras − ventas acumuladas) y volumen por medio segundo">
+          CVD y volumen
+        </button>
         <span className="liq-legend">
           <i className="dot buy" /> compras a mercado <i className="dot sell" /> ventas a mercado
         </span>

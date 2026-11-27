@@ -38,6 +38,8 @@ Muestra gráficos de velas en vivo con datos públicos, sin cuentas ni claves.
   segundo a segundo (una foto cada 0,5 s, franjas finas ±1 %), línea de mejor compra/venta y **burbujas**
   con las operaciones reales (verde compras a mercado, rojo ventas, tamaño según volumen). Zoom en tiempo
   y precio, desplazamiento, "En vivo", contraste y filtro de burbujas. Graba los últimos 30 minutos.
+  A la derecha, el **libro actual** y el **volumen operado por precio**; abajo, **CVD** y **volumen por
+  medio segundo** (cada panel se muestra u oculta con su botón).
 - Indicadores configurables: SMA, EMA y Bandas de Bollinger sobre el precio; RSI, MACD, **CVD** y
   **Delta de volumen** (compras − ventas agresivas, solo cripto) en paneles propios.
   Se pueden agregar varias veces (por ejemplo EMA 20 y EMA 50), cambiar sus valores y su color.

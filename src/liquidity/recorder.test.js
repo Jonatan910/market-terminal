@@ -28,3 +28,15 @@ test('la foto guarda bid, ask y el libro en franjas finas', () => {
   assert.equal(r.step, 2);
   assert.equal(c.data.reduce((a, b) => a + b, 0), 3.5);
 });
+
+test('suma el volumen operado por precio (en las mismas franjas del libro)', () => {
+  const ob = new OrderBook();
+  ob.loadSnapshot({ lastUpdateId: 1, bids: [['59999', '1']], asks: [['60001', '1']] });
+  const r = createLiqRecorder();
+  r.sample(ob, 0); // franja de 2 USDT
+  r.trade({ price: 60000.5, qty: 1, time: 10, isSell: false });
+  r.trade({ price: 59999.6, qty: 2, time: 20, isSell: true }); // misma franja (60000)
+  r.trade({ price: 60010, qty: 4, time: 30, isSell: false });
+  assert.deepEqual(r.volAt.get(30000), { buy: 1, sell: 2 });
+  assert.deepEqual(r.volAt.get(30005), { buy: 4, sell: 0 });
+});
