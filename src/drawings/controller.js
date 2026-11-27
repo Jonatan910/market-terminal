@@ -23,6 +23,7 @@ export function createDrawingController({ chart, series, container, onChange, on
   let market = 'crypto'; // para mostrar los precios con los decimales correctos
   let hidden = false;
   let selectedId = null;
+  let hoverId = null; // dibujo bajo el cursor (algunos muestran sus datos solo así o seleccionados)
   let draft = null; // dibujo que se está creando
   let freehand = false; // pincel: dibujando mientras el botón está apretado
   let drag = null; // arrastre en curso
@@ -112,7 +113,7 @@ export function createDrawingController({ chart, series, container, onChange, on
       const selected = d.id === selectedId || d === draft;
       ctx.save();
       applyStroke(ctx, d.style, selected);
-      def.draw(ctx, d, P, e);
+      def.draw(ctx, d, P, { ...e, selected, hovered: d.id === hoverId });
       ctx.restore();
       if (selected && d !== draft) {
         for (const p of handlesOf(d).map(project)) {
@@ -344,6 +345,11 @@ export function createDrawingController({ chart, series, container, onChange, on
     if (tool === 'cursor' && insidePane(pos)) {
       const hit = hitTest(pos.x, pos.y);
       container.style.cursor = hit ? (hit.handle != null ? 'grab' : ev.altKey ? 'copy' : 'pointer') : '';
+      const id = hit ? hit.drawing.id : null;
+      if (id !== hoverId) {
+        hoverId = id;
+        requestUpdate();
+      }
     } else {
       container.style.cursor = tool !== 'cursor' ? 'crosshair' : '';
     }

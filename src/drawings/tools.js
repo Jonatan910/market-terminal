@@ -187,6 +187,9 @@ function position(isLong) {
       ctx.strokeStyle = '#9aa4b2';
       line(ctx, { x: x0, y: yE }, { x: x0 + w, y: yE });
       ctx.restore();
+      // Los carteles (objetivo, entrada, stop) solo se muestran con la posición seleccionada
+      // o con el mouse encima: así no tapan el gráfico.
+      if (!env.selected && !env.hovered) return;
       const pct = (a, b) => `${b >= a ? '+' : ''}${(((b - a) / a) * 100).toFixed(2)}%`;
       const rr = Math.abs(t.price - e.price) / (Math.abs(e.price - s.price) || 1);
       const mid = x0 + w / 2;
