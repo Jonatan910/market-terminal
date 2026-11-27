@@ -1,0 +1,21 @@
+# Configuración para Render ("Blueprint"): crea el servidor que graba Binance las 24 horas.
+# En Render: New → Blueprint → elegir este repositorio. Pide DATABASE_URL (Supabase).
+services:
+  - type: web
+    name: market-terminal-recorder
+    runtime: node
+    plan: free
+    region: frankfurt # fuera de EE.UU. (Binance Futuros está bloqueado allá)
+    buildCommand: npm ci --omit=dev
+    startCommand: node server/recorder.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false # se carga a mano en Render (es secreta: no va en el código)
+      - key: SYMBOLS
+        value: crypto:BTCUSDT,perp:BTCUSDT
+      - key: RETENTION_DAYS
+        value: "7"
+      - key: NODE_VERSION
+        value: "22"

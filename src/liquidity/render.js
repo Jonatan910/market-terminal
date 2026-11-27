@@ -84,7 +84,7 @@ export function render(ctx, { w, h }, rec, view, opts) {
   const tToX = (t) => pw - (right - t) / msPerPx;
   const pToY = (p) => (top - p) / ppp;
   const yToP = (y) => top - y * ppp;
-  const step = rec.step;
+  const step = last.step || rec.step; // franja de la foto más reciente
 
   // ---------- mapa de calor ----------
   const i0 = Math.max(0, firstAtOrAfter(cols, left) - 1);
@@ -95,8 +95,9 @@ export function render(ctx, { w, h }, rec, view, opts) {
   const pHi = top;
   for (let i = i0; i < cols.length; i += stride) {
     const { base, data } = cols[i];
-    const j0 = Math.max(0, Math.floor(pLo / step) - base);
-    const j1 = Math.min(data.length - 1, Math.ceil(pHi / step) - base);
+    const st = cols[i].step || step;
+    const j0 = Math.max(0, Math.floor(pLo / st) - base);
+    const j1 = Math.min(data.length - 1, Math.ceil(pHi / st) - base);
     for (let j = j0; j <= j1; j++) if (data[j] > 0) sample.push(data[j]);
   }
   sample.sort((a, b) => a - b);
@@ -114,14 +115,15 @@ export function render(ctx, { w, h }, rec, view, opts) {
     const xb = Math.min(pw, i + 1 < cols.length ? Math.floor(tToX(cols[i + 1].t)) : pw); // la última llega hasta "ahora"
     if (xb <= 0 || xa >= pw || xb <= xa) continue;
     colMax.fill(0);
-    const j0 = Math.max(0, Math.floor(pLo / step) - c.base - 1);
-    const j1 = Math.min(c.data.length - 1, Math.ceil(pHi / step) - c.base + 1);
+    const st = c.step || step; // la historia del servidor y lo grabado en vivo pueden tener franjas distintas
+    const j0 = Math.max(0, Math.floor(pLo / st) - c.base - 1);
+    const j1 = Math.min(c.data.length - 1, Math.ceil(pHi / st) - c.base + 1);
     for (let j = j0; j <= j1; j++) {
       const q = c.data[j];
       if (!q) continue;
-      const price = (c.base + j) * step;
-      const ya = Math.max(0, Math.floor(pToY(price + step / 2)));
-      const yb = Math.min(ph, Math.max(ya + 1, Math.ceil(pToY(price - step / 2))));
+      const price = (c.base + j) * st;
+      const ya = Math.max(0, Math.floor(pToY(price + st / 2)));
+      const yb = Math.min(ph, Math.max(ya + 1, Math.ceil(pToY(price - st / 2))));
       for (let y = ya; y < yb; y++) if (q > colMax[y]) colMax[y] = q;
     }
     for (let y = 0; y < ph; y++) {

@@ -1,6 +1,6 @@
 // Mantiene un libro de órdenes de Binance al día (foto + cambios en vivo) y avisa en cada cambio.
-import { fetchDepth, openStream } from '../api/binance';
-import { OrderBook } from './book';
+import { fetchDepth, openStream } from '../api/binance.js';
+import { OrderBook } from './book.js';
 
 export function connectOrderBook(ticker, onChange, venue = 'spot') {
   const book = new OrderBook(venue);

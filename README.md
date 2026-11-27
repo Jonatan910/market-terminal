@@ -85,13 +85,37 @@ npm run dev
 
 Abrí la dirección que aparece (normalmente http://localhost:5173). El servidor de acciones (`/api`) también corre ahí, no hace falta nada más.
 
+## Servidor de grabación (historia del modo liquidez)
+
+`server/recorder.js` graba el libro de órdenes y las operaciones de Binance las 24 horas
+(por defecto BTC spot y BTCUSDT.P, 7 días) y se los da a la terminal en `/history`.
+
+- Cada 2 s, una foto del libro con las 80 franjas más grandes (±1 %); operaciones por segundo.
+- Cada minuto se comprime (≈ 6 KB) y se guarda en **Supabase** (Postgres). 7 días × 2 símbolos ≈ 150 MB.
+- `GET /health`: estado (también lo usa el "ping" que lo mantiene despierto).
+- `GET /history?symbol=crypto:BTCUSDT&from=ms&to=ms&maxCols=1500`: historia comprimida.
+
+Correrlo en la compu (guarda en `./data-recorder`):
+
+```bash
+npm run recorder
+```
+
+Publicarlo gratis:
+
+1. **Supabase**: crear un proyecto y copiar la conexión **Session pooler** (Connect → Session pooler).
+2. **Render**: New → Blueprint → este repositorio (usa `render.yaml`) → pegar `DATABASE_URL`.
+3. **cron-job.org**: un "ping" cada 10 minutos a `https://<tu-servidor>.onrender.com/health`
+   (el plan gratis de Render se duerme a los 15 minutos sin visitas).
+4. En `src/config.js` (o la variable `VITE_RECORDER_URL` de Vercel), la dirección del servidor.
+
 ## Pruebas
 
 ```bash
 npm test
 ```
 
-Verifica los cálculos de los indicadores contra valores conocidos.
+Verifica los cálculos de los indicadores, el libro de órdenes, el detector y el formato del servidor.
 
 ## Arquitectura
 
@@ -119,6 +143,10 @@ Navegador (React)
 ## Estructura
 
 ```
+server/
+  recorder.js              servidor que graba Binance 24 h y entrega la historia
+  codec.js                 formato compacto de cada minuto (con pruebas)
+  store.js                 guardado en Supabase (Postgres) o en archivos
 api/
   candles.js, quotes.js, search.js  funciones del servidor (Vercel)
   _lib/yahoo.js            pedidos a Yahoo Finanzas + caché
@@ -141,6 +169,8 @@ src/
   liquidity/recorder.js    grabación del libro y de las operaciones cada 0,5 s (con pruebas)
   liquidity/render.js      dibujo del modo liquidez en canvas
   liquidity/detector.js    detector de operaciones y paredes grandes (con pruebas)
+  liquidity/history.js     historia del servidor para el modo liquidez
+  config.js                dirección del servidor de grabación
   alerts/conditions.js     cuándo se dispara cada tipo de alerta (con pruebas)
   alerts/useAlertEngine.js vigila los precios de los símbolos con alertas
   alerts/notify.js         sonido, notificación del sistema y título de la pestaña

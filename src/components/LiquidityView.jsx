@@ -5,12 +5,29 @@ import { connectOrderBook } from '../orderbook/live';
 import { getLiqRecorder, LIQ_SAMPLE_MS } from '../liquidity/recorder';
 import { render, AXIS_W, AXIS_H } from '../liquidity/render';
 import { getDetector } from '../liquidity/detector';
+import { getHistory, historyEnabled, loadInitial, loadOlderIfNeeded } from '../liquidity/history';
 import { playChime, systemNotification, unlockAudio, askNotificationPermission } from '../alerts/notify';
 import { formatPrice } from '../format';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const FPS_MS = 66; // se redibuja unas 15 veces por segundo
 const timeFmt = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+const dayFmt = new Intl.DateTimeFormat('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+
+// Une la historia del servidor (lo más viejo) con lo grabado en vivo, sin repetir.
+function merged(hist, rec) {
+  if (!hist?.columns.length) return rec;
+  const t0 = rec.columns[0]?.t ?? Infinity;
+  const b0 = rec.bubbles[0]?.t ?? Infinity;
+  const cols = hist.columns.filter((c) => c.t < t0);
+  const bubs = hist.bubbles.filter((b) => b.t < b0);
+  return {
+    columns: cols.length ? cols.concat(rec.columns) : rec.columns,
+    bubbles: bubs.length ? bubs.concat(rec.bubbles) : rec.bubbles,
+    step: rec.step ?? hist.step,
+    volAt: rec.volAt,
+  };
+}
 const compact = new Intl.NumberFormat('es-AR', { notation: 'compact', maximumFractionDigits: 1 });
 const NEAR = 0.003; // "cerca del precio": dentro del 0,3 %
 
@@ -49,6 +66,8 @@ export default function LiquidityView({ symbol }) {
   const base = parseId(symbol).ticker.replace(/USDT$/, '');
   const [live, setLive] = useState(true);
   const [since, setSince] = useState(null);
+  const [histInfo, setHistInfo] = useState(null); // { from, loading, error } de la historia del servidor
+  const histRef = useRef(null);
   const optsRef = useRef({});
   optsRef.current = { contrast, minBubble, showDom, showBottom, showBig, detector: detRef.current, formatPrice: (n) => formatPrice(n, 'crypto') };
   const supported = isBinance(symbol);
@@ -65,6 +84,12 @@ export default function LiquidityView({ symbol }) {
     recRef.current = rec;
     const det = getDetector(symbol);
     detRef.current = det;
+    // Historia del servidor (si está configurado): las últimas 2 horas al abrir.
+    const hist = historyEnabled() ? getHistory(symbol) : null;
+    histRef.current = hist;
+    const syncHist = () => hist && setHistInfo({ from: hist.columns[0]?.t ?? null, loading: hist.loading, error: hist.error });
+    if (hist) Promise.resolve(loadInitial(hist)).then(syncHist);
+    syncHist();
     setEvents(det.events.slice(0, 8));
     setSince(rec.since);
     let lastNotice = 0;
@@ -102,6 +127,7 @@ export default function LiquidityView({ symbol }) {
       clearInterval(timer);
       recRef.current = null;
       detRef.current = null;
+      histRef.current = null;
     };
   }, [symbol, supported]);
 
@@ -135,7 +161,18 @@ export default function LiquidityView({ symbol }) {
       if (!canvas || !view.size) return;
       const ctx = canvas.getContext('2d');
       ctx.setTransform(view.size.dpr, 0, 0, view.size.dpr, 0, 0);
-      const rec = recRef.current || { columns: [], bubbles: [], step: null };
+      const live = recRef.current || { columns: [], bubbles: [], step: null, volAt: new Map() };
+      const hist = histRef.current;
+      const rec = merged(hist, live);
+      // Si la vista llega más atrás de lo cargado, se pide más historia al servidor.
+      if (hist && view.frame && !hist.loading) {
+        const leftT = view.frame.right - view.frame.pw * view.frame.msPerPx;
+        const p = loadOlderIfNeeded(hist, leftT);
+        if (p) {
+          setHistInfo((h) => ({ ...h, loading: true }));
+          p.then(() => setHistInfo({ from: hist.columns[0]?.t ?? null, loading: false, error: hist.error }));
+        }
+      }
       view.frame = render(ctx, view.size, rec, view, {
         ...optsRef.current,
         message: supported ? null : 'El modo liquidez está disponible para cripto y perpetuos de Binance.',
@@ -253,7 +290,18 @@ export default function LiquidityView({ symbol }) {
       <div className="liq-bar">
         <strong>{pairLabel(symbol)}</strong>
         <span className="badge">Modo liquidez</span>
-        {supported && <span className="muted">{since ? `grabando desde ${timeFmt.format(since)}` : 'conectando…'}</span>}
+        {supported && <span className="muted">{since ? `en vivo desde ${timeFmt.format(since)}` : 'conectando…'}</span>}
+        {supported && historyEnabled() && (
+          <span className="muted" title="Historia grabada por el servidor (hasta 7 días). Desplazá hacia la izquierda para ver más.">
+            {histInfo?.error
+              ? '· servidor sin conexión'
+              : histInfo?.loading
+              ? '· cargando historia…'
+              : histInfo?.from
+              ? `· historia desde ${dayFmt.format(histInfo.from)}`
+              : ''}
+          </span>
+        )}
         <label className="liq-ctl" title="Más contraste: se destacan órdenes más chicas">
           Contraste
           <input type="range" min="0.5" max="4" step="0.1" value={contrast} onChange={(e) => setContrast(Number(e.target.value))} />

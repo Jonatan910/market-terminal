@@ -39,7 +39,7 @@ export function createLiqRecorder() {
       if (bid == null || ask == null) return false;
       const mid = (bid + ask) / 2;
       step ??= niceStep(mid * STEP_FRACTION);
-      columns.push({ t: now, bid, ask, ...bucketizeBook(book.bids, book.asks, mid, step, RANGE) });
+      columns.push({ t: now, bid, ask, step, ...bucketizeBook(book.bids, book.asks, mid, step, RANGE) });
       if (columns.length > MAX_COLUMNS) columns.shift();
       return true;
     },
